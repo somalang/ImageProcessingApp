@@ -1,0 +1,26 @@
+<Window x:Class="ImageProcessing.Views.LogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ImageProcessing.ViewModel"
+        mc:Ignorable="d"
+        Title="Log History"
+        Height="450"
+        Width="400"
+        Topmost="True">
+
+	<Grid Margin="5">
+		<ListView ItemsSource="{Binding LogHistory}" VerticalContentAlignment="Stretch">
+			<ListView.ItemTemplate>
+				<DataTemplate>
+					<TextBlock Text="{Binding}"
+                               ToolTip="{Binding}"
+                               FontSize="11"
+                               TextWrapping="Wrap" />
+				</DataTemplate>
+			</ListView.ItemTemplate>
+		</ListView>
+	</Grid>
+
+</Window>

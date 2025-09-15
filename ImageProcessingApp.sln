@@ -1,0 +1,65 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageProcessingApp", "ImageProcessingApp.csproj", "{FB85FF4C-3E41-4680-B203-511EFF21CF45}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageProcessingWrapper", "..\ImageProcessingWrapper\ImageProcessingWrapper.vcxproj", "{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageProcessingEngineApp", "..\ImageProcessingEngineApp\ImageProcessingEngineApp.vcxproj", "{DACD958D-DDF2-4C26-8205-97642A33E1F5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Debug|x64.Build.0 = Debug|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Debug|x86.Build.0 = Debug|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Release|x64.ActiveCfg = Release|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Release|x64.Build.0 = Release|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Release|x86.ActiveCfg = Release|Any CPU
+		{FB85FF4C-3E41-4680-B203-511EFF21CF45}.Release|x86.Build.0 = Release|Any CPU
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Debug|Any CPU.Build.0 = Debug|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Debug|x64.ActiveCfg = Debug|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Debug|x64.Build.0 = Debug|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Debug|x86.ActiveCfg = Debug|Win32
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Debug|x86.Build.0 = Debug|Win32
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Release|Any CPU.ActiveCfg = Release|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Release|Any CPU.Build.0 = Release|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Release|x64.ActiveCfg = Release|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Release|x64.Build.0 = Release|x64
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Release|x86.ActiveCfg = Release|Win32
+		{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}.Release|x86.Build.0 = Release|Win32
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Debug|Any CPU.Build.0 = Debug|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Debug|x64.ActiveCfg = Debug|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Debug|x64.Build.0 = Debug|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Debug|x86.ActiveCfg = Debug|Win32
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Debug|x86.Build.0 = Debug|Win32
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Release|Any CPU.ActiveCfg = Release|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Release|Any CPU.Build.0 = Release|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Release|x64.ActiveCfg = Release|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Release|x64.Build.0 = Release|x64
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Release|x86.ActiveCfg = Release|Win32
+		{DACD958D-DDF2-4C26-8205-97642A33E1F5}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EC074511-67FE-443F-BA40-830DEBE975FC}
+	EndGlobalSection
+EndGlobal

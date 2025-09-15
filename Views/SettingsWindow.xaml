@@ -1,0 +1,109 @@
+<Window x:Class="ImageProcessing.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="환경 설정"
+        SizeToContent="Height"
+        Width="450"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+        <Style TargetType="TextBlock" x:Key="LabelStyle">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="3"/>
+            <Setter Property="Width" Value="100"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="3"/>
+            <Setter Property="Width" Value="100"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+
+            <GroupBox Header="필터 기본값 설정">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="가우시안 블러 (Sigma):" Style="{StaticResource LabelStyle}" Margin="0,5,10,5"/>
+                    <TextBox   Grid.Row="0" Grid.Column="1" Text="{Binding DefaultGaussianSigma, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="이진화 (임계값):" Style="{StaticResource LabelStyle}" Margin="0,5,10,5"/>
+                    <TextBox   Grid.Row="1" Grid.Column="1" Text="{Binding DefaultBinarizationThreshold, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="팽창 (커널 크기):" Style="{StaticResource LabelStyle}" Margin="0,5,10,5"/>
+                    <TextBox   Grid.Row="2" Grid.Column="1" Text="{Binding DefaultDilationKernelSize, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="침식 (커널 크기):" Style="{StaticResource LabelStyle}" Margin="0,5,10,5"/>
+                    <TextBox   Grid.Row="3" Grid.Column="1" Text="{Binding DefaultErosionKernelSize, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="메디안 필터 (커널 크기):" Style="{StaticResource LabelStyle}" Margin="0,5,10,5"/>
+                    <TextBox   Grid.Row="4" Grid.Column="1" Text="{Binding DefaultMedianKernelSize, UpdateSourceTrigger=PropertyChanged}" Margin="0,5"/>
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="라플라시안 (커널 타입):" Style="{StaticResource LabelStyle}" Margin="0,5,10,5"/>
+                    <ComboBox  Grid.Row="5" Grid.Column="1" SelectedIndex="{Binding DefaultLaplacianKernelType}" Margin="0,5">
+                        <ComboBoxItem Content="4-방향"/>
+                        <ComboBoxItem Content="8-방향"/>
+                    </ComboBox>
+
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="애플리케이션 설정">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="기본 이미지 경로:" Style="{StaticResource LabelStyle}"/>
+                    <TextBox Grid.Column="1" Text="{Binding DefaultImagePath, UpdateSourceTrigger=PropertyChanged}" Width="Auto"
+                             ToolTip="이미지 파일 대화상자의 기본 경로"/>
+                    <Button Grid.Column="2" Content="찾아보기..." Command="{Binding BrowseImagePathCommand}"/>
+                </Grid>
+            </GroupBox>
+
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="기본값으로 재설정" Command="{Binding ResetToDefaultCommand}" Width="120"/>
+            <Button Content="저장" Command="{Binding SaveCommand}" IsDefault="True" Width="60"/>
+            <Button Content="취소" Command="{Binding CancelCommand}" IsCancel="True" Width="60"/>
+        </StackPanel>
+    </Grid>
+</Window>

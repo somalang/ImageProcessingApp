@@ -1,0 +1,21 @@
+<Window x:Class="ImageProcessing.Views.AnalysisReportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:ImageProcessing.ViewModel"
+        mc:Ignorable="d"
+        Title="분석 보고서" Height="450" Width="600"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <TextBox Text="{Binding ReportContent}"
+                     IsReadOnly="True"
+                     Margin="10"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas"
+                     AcceptsReturn="True"
+                     VerticalContentAlignment="Top"/>
+        </ScrollViewer>
+    </Grid>
+</Window>

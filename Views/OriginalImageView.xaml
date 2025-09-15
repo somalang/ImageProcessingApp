@@ -1,0 +1,8 @@
+<Window x:Class="ImageProcessing.Views.OriginalImageView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Original Image" Height="500" Width="800">
+    <Grid>
+        <Image Source="{Binding ImageToShow}" Stretch="Uniform" />
+    </Grid>
+</Window>
