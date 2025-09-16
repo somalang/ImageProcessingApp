@@ -23,6 +23,11 @@ namespace ImageProcessing.Services
             return null;
         }
 
+        public string CheckType(String filepath)
+        {
+
+        }
+
         public async Task<BitmapImage> LoadImage(string filePath)
         {
             return await Task.Run(() =>

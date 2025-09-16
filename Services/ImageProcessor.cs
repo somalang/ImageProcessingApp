@@ -21,9 +21,6 @@ namespace ImageProcessing.Services
         public bool CanRedo => _redoStack.Any();
         public bool HasFFTData => _engine.HasFFTData();
 
-        /// <summary>
-        /// 작업을 수행하기 전 호출하여 Undo 스택에 현재 상태를 저장합니다.
-        /// </summary>
         private void AddToUndoStack(BitmapImage image)
         {
             if (image != null)
@@ -33,7 +30,6 @@ namespace ImageProcessing.Services
             }
         }
 
-        // 1. 모든 필터 및 이미지 처리 메서드는 이 공통 메서드를 통하도록 구조 변경
         private BitmapImage ProcessImage(BitmapImage source, Func<BitmapImage, BitmapImage> processFunction)
         {
             if (source == null) return null;
@@ -48,11 +44,8 @@ namespace ImageProcessing.Services
             rect.Intersect(new Rect(0, 0, source.PixelWidth, source.PixelHeight));
             if (rect.IsEmpty) return null;
 
-            // Crop은 이미지를 자른 '결과'만 반환하고, 원본을 바꾸지 않으므로 Undo 스택에 추가하지 않습니다.
             return new CroppedBitmap(source, new Int32Rect((int)rect.X, (int)rect.Y, (int)rect.Width, (int)rect.Height));
         }
-
-        // ImageProcessor.cs 파일 내
 
         public BitmapImage ClearSelection(BitmapImage source, Rect rect)
         {
@@ -138,6 +131,7 @@ namespace ImageProcessing.Services
         private BitmapImage ApplyFilter(BitmapImage source, Action<byte[], int, int> processAction)
         {
             return ProcessImage(source, (img) => {
+                //이미지를 rgb - bgra 중에 그냥 bgra로 정하기
                 var bitmap = new FormatConvertedBitmap(img, PixelFormats.Bgra32, null, 0);
                 int width = bitmap.PixelWidth;
                 int height = bitmap.PixelHeight;
