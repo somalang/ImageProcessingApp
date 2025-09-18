@@ -2,9 +2,7 @@
 
 class ImageProcessingEngine {
 	//상수
-	int stride;
 	//필드
-	unsigned int* editedImage; // 벡터로?
 	//속성
 	ImageProcessingEngine();
 	//생성자
