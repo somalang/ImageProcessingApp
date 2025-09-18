@@ -2,9 +2,11 @@
 #include <cmath>
 #include <numbers>
 #include <vector>
+#include <complex>
 #include <algorithm>
 #include <cstring>
 #include "ImageProcessingEngineApp.h"
+using namespace std;
 
 void ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, int width, int height) {
 	// 사진의 크기를 확인한다 -> 매개변수로 받음
@@ -181,7 +183,7 @@ void ImageProcessingEngine::ApplySobel(unsigned char* pixels, int width, int hei
 		{-1, -2, -1}
 	};
 
-	// 경계(1픽셀)를 제외하고 컨볼루션 연산 수행
+	// 경계 제외 컨볼루션 연산
 	for (int i = 1; i < height - 1; i++) {
 		for (int j = 1; j < width - 1; j++) {
 			double sumX = 0;
@@ -282,9 +284,89 @@ void ImageProcessingEngine::TemplateMatch(
 	}
 }
 
-void ApplyFFT(unsigned char* data, int width, int height) {
-	// 
-}
-void ApplyIFFT(unsigned char* data, int width, int height) {
+void fft1d(vector<complex<double>>& data, bool inverse = false) {
+	int num = data.size();
+	if (num <= 1) return;
 
+	// 짝수/홀수 분리
+	vector<complex<double>> even(num / 2), odd(num / 2);
+	for (int i = 0; i < num / 2; i++) {
+		even[i] = data[2 * i];
+		odd[i] = data[2 * i + 1];
+	}
+
+	// 재귀 호출
+	fft1d(even, inverse);
+	fft1d(odd, inverse);
+
+	// 결합 (버터플라이)
+	for (int i = 0; i < num / 2; i++) {
+		double angle = (inverse ? 2 : -2) * std::numbers::pi * i / num;
+		complex<double> w(cos(angle), sin(angle));
+		data[i] = even[i] + w * odd[i];
+		data[i + num / 2] = even[i] - w * odd[i];
+	}
+
+	// IFFT일 경우 결과를 n으로 나누기
+	if (inverse) {
+		for (auto& i : data) i /= 2.0;
+	}
+}
+
+void ApplyFFT(unsigned char* pixels, int width, int height) {
+	// 2D 데이터를 복소수 벡터로 변환
+	vector<vector<complex<double>>> data(height, vector<complex<double>>(width));
+	for (int j = 0; j < height; j++)
+		for (int i = 0; i < width; i++)
+			data[j][i] = complex<double>(pixels[j * width + i], 0.0);
+
+	// 행별 1D FFT
+	for (int j = 0; j < height; j++)
+		fft1d(data[j], false);
+
+	// 열별 1D FFT
+	for (int i = 0; i < width; i++) {
+		vector<complex<double>> col(height);
+		for (int j = 0; j < height; j++)
+			col[j] = data[j][i];
+		fft1d(col, false);
+		for (int j = 0; j < height; j++)
+			data[j][i] = col[j];
+	}
+
+	// 결과 저장
+	for (int j = 0; j < height; j++)
+		for (int i = 0; i < width; i++) {
+			double mag = abs(data[j][i]);
+			pixels[j * width + i] = static_cast<unsigned char>(clamp(mag, 0.0, 255.0));
+		}
+}
+
+void ApplyIFFT(unsigned char* pixels, int width, int height) {
+	// 2D 데이터를 복소수 벡터로 변환
+	vector<vector<complex<double>>> data(height, vector<complex<double>>(width));
+	for (int j = 0; j < height; j++)
+		for (int i = 0; i < width; i++)
+			data[j][i] = complex<double>(pixels[j * width + i], 0.0);
+
+	// 행연산
+	for (int j = 0; j < height; j++)
+		fft1d(data[j], true);
+
+	// 열연산
+	for (int i = 0; i < width; i++) {
+		vector<complex<double>> col(height);
+		for (int j = 0; j < height; j++)
+			col[j] = data[j][i];
+		fft1d(col, true);
+		for (int j = 0; j < height; j++)
+			data[j][i] = col[j];
+	}
+
+	// 결과 저장
+	for (int j = 0; j < height; j++)
+		for (int i = 0; i < width; i++) {
+			double val = data[j][i].real();
+			pixels[j * width + i] = static_cast<unsigned char>(clamp(val, 0.0, 255.0));
+		}
 }
