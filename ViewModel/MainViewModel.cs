@@ -51,7 +51,6 @@ namespace ImageProcessing.ViewModel
         private double zoomLevel = 1.0;
         private BitmapSource _previewImage;
         private readonly ImageProcessor _imageProcessor;
-        private readonly GPUImageProcessor _gpuImageProcessor;
 
         // 기타
         private string lastImagePath;
@@ -222,7 +221,7 @@ namespace ImageProcessing.ViewModel
             logService = new LogService();
             clipboardService = new ClipboardService();
             _imageProcessor = new ImageProcessor();
-            _gpuImageProcessor = new GPUImageProcessor();
+            //_gpuImageProcessor = new GPUImageProcessor();
 
             lastImagePath = settingService.GetLastImagePath();
             ProcessingTime = "Process Time: 0 ms";
@@ -289,14 +288,8 @@ namespace ImageProcessing.ViewModel
             LoadImageCommand = new RelayCommand(async _ => await LoadImageAsync());
             SaveImageCommand = new RelayCommand(async _ => await SaveImageAsync(), _ => CurrentBitmapImage != null);
 
-            ApplyGrayscaleCommand = new RelayCommand(_ => ApplyFilter(() => {
-                // GPU 처리를 위해 BitmapSource를 System.Drawing.Bitmap으로 변환
-                var originalBitmap = ImageUtility.BitmapSourceToBitmap(CurrentBitmapImage);
-                // GPU로 처리
-                var processedBitmapSource = _gpuImageProcessor.ApplyGrayscaleFilter(originalBitmap);
-                // 결과를 다시 BitmapImage로 변환하여 반환
-                return BitmapSourceToBitmapImage(processedBitmapSource);
-            }, "Grayscale (GPU)"));
+            ApplyGrayscaleCommand = new RelayCommand(_ => ApplyFilter(() => 
+            _imageProcessor.ApplyGrayscale(currentBitmapImage),"GrayScale"));
 
             // 2. 나머지 필터들은 모두 기존의 CPU 방식(_imageProcessor)으로 되돌립니다.
             ApplySobelCommand = new RelayCommand(_ => ApplyFilter(() =>
@@ -318,7 +311,7 @@ namespace ImageProcessing.ViewModel
                 _imageProcessor.ApplyErosion(CurrentBitmapImage, FilterParameters.ErosionKernelSize), "Erosion"));
 
             ApplyMedianFilterCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyMedianFilter(CurrentBitmapImage, FilterParameters.MedianKernelSize), "Median Filter"));
+                _imageProcessor.ApplyMedian(CurrentBitmapImage, FilterParameters.MedianKernelSize), "Median Filter"));
 
             FFTCommand = new RelayCommand(_ => ExecuteFFT(), _ => CurrentBitmapImage != null);
             IFFTCommand = new RelayCommand(_ => ApplyIFFT(), _ => CurrentBitmapImage != null && _imageProcessor.HasFFTData);

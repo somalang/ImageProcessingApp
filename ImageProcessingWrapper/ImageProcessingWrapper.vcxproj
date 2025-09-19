@@ -25,7 +25,7 @@
     <Keyword>NetCoreCProj</Keyword>
     <RootNamespace>ImageProcessingWrapper</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-	<TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -81,9 +81,11 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\sohyun\source\repos\ImageProcessingApp\ImageProcessingEngineApp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies />
+      <AdditionalDependencies>ImageProcessingEngineApp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\sohyun\source\repos\ImageProcessingApp\ImageProcessingEngineApp;C:\Users\sohyun\source\repos\ImageProcessingApp\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -141,7 +143,7 @@
     <Image Include="app.ico" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ImageProcessingApp\ImageProcessingEngineApp\ImageProcessingEngineApp.vcxproj">
+    <ProjectReference Include="..\ImageProcessingEngineApp\ImageProcessingEngineApp.vcxproj">
       <Project>{dacd958d-ddf2-4c26-8205-97642a33e1f5}</Project>
     </ProjectReference>
   </ItemGroup>

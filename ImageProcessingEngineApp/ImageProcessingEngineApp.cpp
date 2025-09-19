@@ -8,7 +8,7 @@
 #include "ImageProcessingEngineApp.h"
 using namespace std;
 
-void ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, int width, int height) {
 	// 사진의 크기를 확인한다 -> 매개변수로 받음
 	// 모든 픽셀의 RGB 값을 구한다
 	unsigned int avg = 0;
@@ -25,7 +25,7 @@ void ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, int width, int
 	}
 }
 
-void ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixels, int width, int height, int sigma) {
+void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixels, int width, int height, float sigma) {
 	// 이미 그레이스케일이 적용되어있다고 가정
 	// 가우시안 커널 계산
 	std::vector<double> kernel(sigma * 8 + 1);
@@ -57,7 +57,7 @@ void ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixels, int width, 
 	memcpy(pixels, temp.data(), width * height);
 }
 
-void ImageProcessingEngine::ApplyMedianFilter(unsigned char* pixels, int width, int height, int kernelSize) {
+void NativeEngine::ImageProcessingEngine::ApplyMedian(unsigned char* pixels, int width, int height, int kernelSize) {
 	// 픽셀 순회하면서 커널 사이즈에 해당하는 영역 중에 중앙값 골라서 대체
 	std::vector<unsigned char> result(width * height, 0);
 
@@ -83,7 +83,7 @@ void ImageProcessingEngine::ApplyMedianFilter(unsigned char* pixels, int width, 
 	}
 }
 
-void ImageProcessingEngine::ApplyBinarization(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixels, int width, int height) {
 	// 오츠 이진화 방식을 사용
 	std::vector<int> histogram(256, 0);
 
@@ -129,7 +129,7 @@ void ImageProcessingEngine::ApplyBinarization(unsigned char* pixels, int width, 
 	}
 }
 
-void ImageProcessingEngine::ApplyDilation(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyDilation(unsigned char* pixels, int width, int height) {
 	std::vector<unsigned char> temp(width * height, 0);
 	// 전체 노드 순회하기 (4 - 연결성)
 	// 중심 픽셀 기준 커널 올려두기
@@ -146,7 +146,7 @@ void ImageProcessingEngine::ApplyDilation(unsigned char* pixels, int width, int 
 	memcpy(pixels, temp.data(), width * height);
 }
 
-void ImageProcessingEngine::ApplyErosion(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyErosion(unsigned char* pixels, int width, int height) {
 	std::vector<unsigned char> temp(width * height, 255);
 	// 전체 노드 순회하기 (4 - 연결성)
 	// 중심 픽셀 기준 커널 올려두기
@@ -162,7 +162,7 @@ void ImageProcessingEngine::ApplyErosion(unsigned char* pixels, int width, int h
 	// 모든 픽셀이 다 하얀색이면 흰색으로 , 하나라도 검은색이면 검은색으로 두기
 	memcpy(pixels, temp.data(), width * height);
 }
-void ImageProcessingEngine::ApplySobel(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplySobel(unsigned char* pixels, int width, int height) {
 	// 결과를 저장할 버퍼
 	std::vector<unsigned char> result(width * height, 0);
 	// x, y 방향 그래디언트를 임시 저장할 버퍼
@@ -223,7 +223,7 @@ void ImageProcessingEngine::ApplySobel(unsigned char* pixels, int width, int hei
 	memcpy(pixels, result.data(), width * height);
 }
 
-void ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, int width, int height) {
 	std::vector<unsigned char> result(width * height, 0);
 	//라플라시안 커널
 	int kernel[3][3] = {
@@ -252,7 +252,7 @@ void ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, int width, int
 	memcpy(pixels, result.data(), width * height);
 }
 
-void ImageProcessingEngine::TemplateMatch(
+void NativeEngine::ImageProcessingEngine::ApplyTemplateMatch(
 	unsigned char* originalPixels, int originalWidth, int originalHeight,
 	unsigned char* templatePixels, int templateWidth, int templateHeight,
 	int* matchX, int* matchY)
@@ -313,7 +313,7 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 	}
 }
 
-void ApplyFFT(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int width, int height) {
 	// 2D 데이터를 복소수 벡터로 변환
 	vector<vector<complex<double>>> data(height, vector<complex<double>>(width));
 	for (int j = 0; j < height; j++)
@@ -335,14 +335,16 @@ void ApplyFFT(unsigned char* pixels, int width, int height) {
 	}
 
 	// 결과 저장
-	for (int j = 0; j < height; j++)
+	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
 			double mag = abs(data[j][i]);
 			pixels[j * width + i] = static_cast<unsigned char>(clamp(mag, 0.0, 255.0));
 		}
+	}
+
 }
 
-void ApplyIFFT(unsigned char* pixels, int width, int height) {
+void NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int width, int height) {
 	// 2D 데이터를 복소수 벡터로 변환
 	vector<vector<complex<double>>> data(height, vector<complex<double>>(width));
 	for (int j = 0; j < height; j++)
@@ -364,9 +366,18 @@ void ApplyIFFT(unsigned char* pixels, int width, int height) {
 	}
 
 	// 결과 저장
-	for (int j = 0; j < height; j++)
+	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
 			double val = data[j][i].real();
 			pixels[j * width + i] = static_cast<unsigned char>(clamp(val, 0.0, 255.0));
 		}
+	}
+}
+
+void NativeEngine::ImageProcessingEngine::ClearFFTData() {
+
+}
+
+bool NativeEngine::ImageProcessingEngine::HasFFTData() {
+
 }

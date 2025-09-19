@@ -1,4 +1,4 @@
-﻿using ImageProcessingEngine;
+﻿using ImageProcessingWrapper;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -110,14 +110,14 @@ namespace ImageProcessing.Services
             int templateStride = templateBitmap.PixelWidth * 4;
             byte[] templatePixels = new byte[templateBitmap.PixelHeight * templateStride];
             templateBitmap.CopyPixels(templatePixels, templateStride, 0);
-
-            bool success = _engine.TemplateMatch(
+            int matchX = -1, matchY = -1;
+            _engine.ApplyTemplateMatch(
                 sourcePixels, source.PixelWidth, source.PixelHeight,
                 templatePixels, templateImage.PixelWidth, templateImage.PixelHeight,
-                out int matchX, out int matchY
+                ref matchX, ref matchY
             );
 
-            if (success)
+            if (matchX >= 0 && matchY >= 0) // 적절한 성공 조건으로 수정
             {
                 return new Rect(matchX, matchY, templateImage.PixelWidth, templateImage.PixelHeight);
             }
@@ -127,7 +127,6 @@ namespace ImageProcessing.Services
                 return Rect.Empty;
             }
         }
-
         private BitmapImage ApplyFilter(BitmapImage source, Action<byte[], int, int> processAction)
         {
             return ProcessImage(source, (img) => {
@@ -149,11 +148,11 @@ namespace ImageProcessing.Services
         public BitmapImage ApplyGrayscale(BitmapImage source) => ApplyFilter(source, (p, w, h) => _engine.ApplyGrayscale(p, w, h));
         public BitmapImage ApplyGaussianBlur(BitmapImage source, float sigma) => ApplyFilter(source, (p, w, h) => _engine.ApplyGaussianBlur(p, w, h, sigma));
         public BitmapImage ApplySobel(BitmapImage source) => ApplyFilter(source, (p, w, h) => _engine.ApplySobel(p, w, h));
-        public BitmapImage ApplyLaplacian(BitmapImage source, int kernelType) => ApplyFilter(source, (p, w, h) => _engine.ApplyLaplacian(p, w, h, kernelType));
-        public BitmapImage ApplyBinarization(BitmapImage source, int param = 128) => ApplyFilter(source, (p, w, h) => _engine.ApplyBinarization(p, w, h, param));
-        public BitmapImage ApplyDilation(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyDilation(p, w, h, param));
-        public BitmapImage ApplyErosion(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyErosion(p, w, h, param));
-        public BitmapImage ApplyMedianFilter(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyMedian(p, w, h, param));
+        public BitmapImage ApplyLaplacian(BitmapImage source, int kernelType) => ApplyFilter(source, (p, w, h) => _engine.ApplyLaplacian(p, w, h));
+        public BitmapImage ApplyBinarization(BitmapImage source, int param = 128) => ApplyFilter(source, (p, w, h) => _engine.ApplyBinarization(p, w, h));
+        public BitmapImage ApplyDilation(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyDilation(p, w, h));
+        public BitmapImage ApplyErosion(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyErosion(p, w, h));
+        public BitmapImage ApplyMedian(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyMedian(p, w, h, param));
 
         public BitmapImage ApplyFFT(BitmapImage source)
         {
@@ -194,6 +193,7 @@ namespace ImageProcessing.Services
                 return ConvertBitmapSourceToBitmapImage(BitmapSource.Create(bitmap.PixelWidth, bitmap.PixelHeight, 96, 96, PixelFormats.Bgra32, null, pixels, bitmap.PixelWidth * 4));
             });
         }
+        // 프로세스 내부냐 아니면 사용자 접근 여부를 따지는 거냐 ..어쩌구
 
         public void ClearFFTData() => _engine.ClearFFTData();
 

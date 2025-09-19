@@ -1,27 +1,35 @@
 ﻿#pragma once
+#include "ImageProcessingEngineApp.h" // NativeEngine 클래스 포함
 
 using namespace System;
 
 namespace ImageProcessingWrapper {
 
-    public ref class ImageProcessor
+    public ref class ImageEngine
     {
     private:
-        // 네이티브 엔진 객체
-        ImageProcessingEngine* engine;
+        NativeEngine::ImageProcessingEngine* _nativeEngine;
 
     public:
-        ImageProcessor();
-        ~ImageProcessor();
-        !ImageProcessor();
+        ImageEngine() {
+            _nativeEngine = new NativeEngine::ImageProcessingEngine();
+        }
+
+        ~ImageEngine() { this->!ImageEngine(); }
+        !ImageEngine() { delete _nativeEngine; }
 
         void ApplyGrayscale(array<System::Byte>^ pixels, int width, int height);
-        void ApplyGaussianBlur(array<System::Byte>^ pixels, int width, int height, int sigma);
-        void ApplyMedianFilter(array<System::Byte>^ pixels, int width, int height, int kernelSize);
+        void ApplyGaussianBlur(array<Byte>^ data, int width, int height, float sigma);
+        void ApplyMedian(array<System::Byte>^ pixels, int width, int height, int kernelSize);
         void ApplyBinarization(array<System::Byte>^ pixels, int width, int height);
         void ApplyDilation(array<System::Byte>^ pixels, int width, int height);
         void ApplyErosion(array<System::Byte>^ pixels, int width, int height);
         void ApplySobel(array<System::Byte>^ pixels, int width, int height);
         void ApplyLaplacian(array<System::Byte>^ pixels, int width, int height);
+        void ApplyTemplateMatch(array<System::Byte>^ originalPixels, int width, int height, array<System::Byte>^ templatePixels, int templateWidth, int templateHeight, int% matchX, int% matchY);
+        void ApplyFFT(array<System::Byte>^ pixels, int width, int height);
+        void ApplyIFFT(array<System::Byte>^ pixels, int width, int height);
+        void ClearFFTData();
+        bool HasFFTData();
     };
 }

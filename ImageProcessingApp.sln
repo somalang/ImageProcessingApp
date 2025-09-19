@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageProcessingApp", "Image
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageProcessingEngineApp", "ImageProcessingEngineApp\ImageProcessingEngineApp.vcxproj", "{DACD958D-DDF2-4C26-8205-97642A33E1F5}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageProcessingWrapper", "..\ImageProcessingWrapper\ImageProcessingWrapper.vcxproj", "{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageProcessingWrapper", "ImageProcessingWrapper\ImageProcessingWrapper.vcxproj", "{42E5DFE5-B975-BF10-DFBA-4215B93C0F91}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

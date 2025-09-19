@@ -1,59 +1,71 @@
+#include "pch.h"
 #include "ImageProcessingWrapper.h"
 #include "ImageProcessingEngineApp.h"
-
 using namespace ImageProcessingWrapper;
+//래퍼함수 하나 만들어서 중복한 거 빼기
 
-ImageProcessor::ImageProcessor() {
-    engine = new ImageProcessingEngine();
-}
 
-ImageProcessor::~ImageProcessor() {
-    this->!ImageProcessor();
-}
-
-ImageProcessor::!ImageProcessor() {
-    if (engine != nullptr) {
-        delete engine;
-        engine = nullptr;
-    }
-}
-
-void ImageProcessor::ApplyGrayscale(array<System::Byte>^ pixels, int width, int height) {
+void ImageEngine::ApplyGrayscale(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyGrayscale(p, width, height);
+    _nativeEngine->ApplyGrayscale(p, width, height);
+}
+void ImageEngine::ApplyGaussianBlur(array<System::Byte>^ pixels, int width, int height, float sigma) {
+    pin_ptr<unsigned char> p = &pixels[0];
+    _nativeEngine->ApplyGaussianBlur(p, width, height, sigma);
 }
 
-void ImageProcessor::ApplyGaussianBlur(array<System::Byte>^ pixels, int width, int height, int sigma) {
+void ImageEngine::ApplyMedian(array<System::Byte>^ pixels, int width, int height, int kernelSize) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyGaussianBlur(p, width, height, sigma);
+    _nativeEngine->ApplyMedian(p, width, height, kernelSize);
 }
 
-void ImageProcessor::ApplyMedianFilter(array<System::Byte>^ pixels, int width, int height, int kernelSize) {
+void ImageEngine::ApplyBinarization(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyMedianFilter(p, width, height, kernelSize);
+    _nativeEngine->ApplyBinarization(p, width, height);
 }
 
-void ImageProcessor::ApplyBinarization(array<System::Byte>^ pixels, int width, int height) {
+void ImageEngine::ApplyDilation(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyBinarization(p, width, height);
+    _nativeEngine->ApplyDilation(p, width, height);
 }
 
-void ImageProcessor::ApplyDilation(array<System::Byte>^ pixels, int width, int height) {
+void ImageEngine::ApplyErosion(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyDilation(p, width, height);
+    _nativeEngine->ApplyErosion(p, width, height);
 }
 
-void ImageProcessor::ApplyErosion(array<System::Byte>^ pixels, int width, int height) {
+void ImageEngine::ApplySobel(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyErosion(p, width, height);
+    _nativeEngine->ApplySobel(p, width, height);
 }
 
-void ImageProcessor::ApplySobel(array<System::Byte>^ pixels, int width, int height) {
+void ImageEngine::ApplyLaplacian(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplySobel(p, width, height);
+    _nativeEngine->ApplyLaplacian(p, width, height);
 }
 
-void ImageProcessor::ApplyLaplacian(array<System::Byte>^ pixels, int width, int height) {
+void ImageEngine::ApplyTemplateMatch(array<System::Byte>^ originalPixels, int width, int height, array<System::Byte>^ templatePixels, int templateWidth, int templateHeight, int% matchX, int% matchY){
+    pin_ptr<unsigned char> p = &originalPixels[0];
+    pin_ptr<unsigned char> t = &templatePixels[0];
+
+    pin_ptr<int> px = &matchX;
+    pin_ptr<int> py = &matchY;
+
+    _nativeEngine->ApplyTemplateMatch(p, width, height, t,  templateWidth, templateHeight, px, py);
+}
+
+void ImageEngine::ApplyFFT(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    engine->ApplyLaplacian(p, width, height);
+    _nativeEngine->ApplyFFT(p, width, height);
+}
+
+void ImageEngine::ApplyIFFT(array<System::Byte>^ pixels, int width, int height) {
+    pin_ptr<unsigned char> p = &pixels[0];
+    _nativeEngine->ApplyIFFT(p, width, height);
+}
+void ImageEngine::ClearFFTData() {
+    _nativeEngine->ClearFFTData();
+}
+bool ImageEngine::HasFFTData() {
+    _nativeEngine->ClearFFTData();
 }
