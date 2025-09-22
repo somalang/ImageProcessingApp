@@ -22,6 +22,8 @@ namespace NativeEngine {
 		//필드
 		//속성
 		std::vector<std::vector<std::complex<double>>> _fftData;
+		std::vector<std::vector<std::complex<double>>> _fftDataBackup;
+		void fftShift();
 		//생성자
 		//퍼블릭 메서드
 	public:

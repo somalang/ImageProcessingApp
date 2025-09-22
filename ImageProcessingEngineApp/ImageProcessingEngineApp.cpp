@@ -1,4 +1,6 @@
-﻿#include "ImageProcessingEngineApp.h"
+﻿#include <fstream>
+
+#include "ImageProcessingEngineApp.h"
 
 using namespace std;
 
@@ -20,307 +22,506 @@ void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, 
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixels, int width, int height, float sigma) {
-	// 이미 그레이스케일이 적용되어있다고 가정
-	// 가우시안 커널 계산
-	std::vector<double> kernel(sigma * 8 + 1);
-	double sum = 0.0;
-	for (int i = -sigma * 4; i <= sigma * 4; i++) {
-		double denom = sqrt(2 * std::numbers::pi * pow(sigma, 2)); // 분모
-		double numerator = exp(-(i * i) / (2 * pow(sigma, 2)));
-		kernel[i + sigma * 4] = numerator / denom;
-		sum += kernel[i + sigma * 4];
-	}
-	//정규화
-	for (double& val : kernel) val /= sum;
+	const int channels = 4; // BGRA 포맷이므로 4채널
+	const int stride = width * channels;
+	const int dataSize = stride * height;
 
-	// 임시 결과 저장
-	std::vector<unsigned char> temp(width * height, 0);
-	//가우시안 적용 - 가로 컨볼루션
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			double acc = 0.0;
-			for (int k = -sigma * 4; k <= sigma * 4; k++) {
-				// 경계처리 - clamp 사용
+	// 가우시안 커널 계산
+	int kernelRadius = static_cast<int>(ceil(sigma * 3));
+	int kernelSize = kernelRadius * 2 + 1;
+	std::vector<double> kernel(kernelSize);
+	double sum = 0.0;
+
+	for (int i = 0; i < kernelSize; i++) {
+		kernel[i] = exp(-0.5 * pow((i - kernelRadius) / sigma, 2.0));
+		sum += kernel[i];
+	}
+	// 정규화
+	for (int i = 0; i < kernelSize; i++) {
+		kernel[i] /= sum;
+	}
+
+	std::vector<unsigned char> temp(dataSize);
+
+	// 1. 수평 방향 블러 적용
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			double b = 0.0, g = 0.0, r = 0.0;
+			for (int k = -kernelRadius; k <= kernelRadius; ++k) {
 				int nx = std::clamp(x + k, 0, width - 1);
-				acc += pixels[y * width + nx] * kernel[k + sigma * 4];
+				int idx = y * stride + nx * channels;
+				double weight = kernel[k + kernelRadius];
+				b += pixels[idx + 0] * weight;
+				g += pixels[idx + 1] * weight;
+				r += pixels[idx + 2] * weight;
 			}
-			// 계산 결과 클램핑
-			temp[y * width + x] = static_cast<unsigned char>(std::clamp(acc, 0.0, 255.0));
+			int out_idx = y * stride + x * channels;
+			temp[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
+			temp[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
+			temp[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
+			temp[out_idx + 3] = pixels[out_idx + 3]; // 알파 채널은 그대로 유지
 		}
 	}
-	memcpy(pixels, temp.data(), width * height);
+
+	// 2. 수직 방향 블러 적용
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			double b = 0.0, g = 0.0, r = 0.0;
+			for (int k = -kernelRadius; k <= kernelRadius; ++k) {
+				int ny = std::clamp(y + k, 0, height - 1);
+				int idx = ny * stride + x * channels;
+				double weight = kernel[k + kernelRadius];
+				b += temp[idx + 0] * weight;
+				g += temp[idx + 1] * weight;
+				r += temp[idx + 2] * weight;
+			}
+			int out_idx = y * stride + x * channels;
+			pixels[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
+			pixels[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
+			pixels[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
+			// 알파 채널은 이미 temp에 복사되어 있으므로 따로 처리할 필요 없음
+		}
+	}
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyMedian(unsigned char* pixels, int width, int height, int kernelSize) {
-	// 픽셀 순회하면서 커널 사이즈에 해당하는 영역 중에 중앙값 골라서 대체
-	std::vector<unsigned char> result(width * height, 0);
+	const int channels = 4; // BGRA 포맷
+	const int stride = width * channels;
+	const int dataSize = stride * height;
 
-	// 부드러운 이동을 위한 가로세로 이동
-	for (int j = 0; j < height; j++) {  // 세로부터
-		for (int i = 0; i < width; i++) {
-			// 커널 단위로 처리
-			std::vector<int> temp;
-			for (int k = -(kernelSize / 2); k <= kernelSize / 2; k++) {
-				for (int m = -(kernelSize / 2); m <= kernelSize / 2; m++) {
-					int tempX = std::clamp(i + m, 0, width - 1);
-					int tempY = std::clamp(j + k, 0, height - 1);
-					temp.push_back(pixels[tempY * width + tempX]);
+	// 최종 결과를 저장할 버퍼. 크기를 4채널에 맞게 수정합니다.
+	std::vector<unsigned char> result(dataSize);
+
+	int kernelHalf = kernelSize / 2;
+
+	// 이미지의 각 픽셀을 순회합니다.
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			// 각 채널(B, G, R)의 이웃 픽셀 값들을 저장할 벡터
+			std::vector<unsigned char> neighborhood_b;
+			std::vector<unsigned char> neighborhood_g;
+			std::vector<unsigned char> neighborhood_r;
+
+			// 커널(마스크)을 순회하며 이웃 픽셀 값을 수집합니다.
+			for (int ky = -kernelHalf; ky <= kernelHalf; ky++) {
+				for (int kx = -kernelHalf; kx <= kernelHalf; kx++) {
+					// 경계 처리
+					int nx = std::clamp(x + kx, 0, width - 1);
+					int ny = std::clamp(y + ky, 0, height - 1);
+
+					// 4채널을 고려한 인덱스 계산
+					int neighbor_idx = ny * stride + nx * channels;
+
+					// 각 채널의 값을 해당 벡터에 추가
+					neighborhood_b.push_back(pixels[neighbor_idx + 0]);
+					neighborhood_g.push_back(pixels[neighbor_idx + 1]);
+					neighborhood_r.push_back(pixels[neighbor_idx + 2]);
 				}
 			}
-			//정렬해서 중앙값 뽑아내기
-			std::sort(temp.begin(), temp.end());
-			result[j * width + i] = temp[temp.size() / 2];
+
+			// 각 채널별로 정렬하여 중앙값을 찾습니다.
+			std::sort(neighborhood_b.begin(), neighborhood_b.end());
+			std::sort(neighborhood_g.begin(), neighborhood_g.end());
+			std::sort(neighborhood_r.begin(), neighborhood_r.end());
+
+			// 4채널을 고려한 현재 픽셀의 인덱스
+			int current_idx = y * stride + x * channels;
+
+			// 중앙값으로 결과 버퍼를 채웁니다.
+			size_t median_index = neighborhood_b.size() / 2;
+			result[current_idx + 0] = neighborhood_b[median_index]; // Blue
+			result[current_idx + 1] = neighborhood_g[median_index]; // Green
+			result[current_idx + 2] = neighborhood_r[median_index]; // Red
+			result[current_idx + 3] = pixels[current_idx + 3]; // Alpha 채널은 원본 값 유지
 		}
 	}
-	for (int i = 0; i < width * height; i++) {
-		pixels[i] = result[i];
-	}
+
+	// 처리된 결과(result)를 원본 픽셀 버퍼(pixels)로 복사합니다.
+	memcpy(pixels, result.data(), dataSize);
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixels, int width, int height) {
-	// 오츠 이진화 방식을 사용
+	const int channels = 4;
+	const int stride = width * channels;
+	const int pixel_count = width * height;
+
+	// 1. BGRA 이미지를 그레이스케일로 변환하여 임시 버퍼에 저장
+	std::vector<unsigned char> gray_pixels(pixel_count);
+	for (int i = 0; i < pixel_count; ++i) {
+		// 밝기 평균 (Luminosity-preserving)
+		gray_pixels[i] = static_cast<unsigned char>(
+			0.114 * pixels[i * channels + 0] + // Blue
+			0.587 * pixels[i * channels + 1] + // Green
+			0.299 * pixels[i * channels + 2]   // Red
+			);
+	}
+
+	// 2. 그레이스케일 이미지로 히스토그램 생성 및 Otsu 임계값 계산
 	std::vector<int> histogram(256, 0);
-
-	int sum = 0;
-	// 히스토그램
-	for (int i = 0; i < width * height; i++) {
-		histogram[pixels[i]]++;
+	for (int i = 0; i < pixel_count; i++) {
+		histogram[gray_pixels[i]]++;
 	}
-	for (int i = 0; i < 256; i++) {
-		sum += i * histogram[i];
-	}
-	//평균
-	int avg = sum / (width * height);
 
-	// 오츠 알고리즘 사용
+	int total = pixel_count;
+	float sum = 0;
+	for (int t = 0; t < 256; t++) sum += t * histogram[t];
+
+	float sumB = 0;
+	int wB = 0;
+	int wF = 0;
+
+	float maxVar = 0;
 	int threshold = 0;
-	int maxVar = 0;
-	for (int t = 0; t < 256; t++) { // 임계값의 기준이 되는 루프
-		int sumA = 0, sumB = 0, weightA = 0, weightB = 0;
-		for (int j = 0; j < 256; j++) {
-			//그룹 나누기
-			if (j < t) {//임계값이 더 크면
-				sumA += j * histogram[j];
-				weightA += histogram[j];
-			}
-			else {
-				sumB += j * histogram[j];
-				weightB += histogram[j];
-			}
-		}
-		if (weightA == 0 || weightB == 0) continue;
-		int meanA = sumA / weightA;
-		int meanB = sumB / weightB;
-		int varBetween = weightA * weightB * (meanA - meanB) * (meanA - meanB);
+
+	for (int t = 0; t < 256; t++) {
+		wB += histogram[t]; // 배경 가중치
+		if (wB == 0) continue;
+
+		wF = total - wB; // 전경 가중치
+		if (wF == 0) break;
+
+		sumB += (float)(t * histogram[t]);
+
+		float mB = sumB / wB; // 배경 평균
+		float mF = (sum - sumB) / wF; // 전경 평균
+
+		// 클래스 간 분산 계산
+		float varBetween = (float)wB * (float)wF * (mB - mF) * (mB - mF);
+
 		if (varBetween > maxVar) {
 			maxVar = varBetween;
 			threshold = t;
 		}
 	}
-	//임계값 가지고 이진화
-	for (int i = 0; i < width * height; i++) {
-		pixels[i] = (pixels[i] < threshold) ? 0 : 255;
+
+	// 3. 계산된 임계값을 사용하여 원본 BGRA 이미지에 이진화 적용
+	for (int i = 0; i < pixel_count; ++i) {
+		unsigned char value = (gray_pixels[i] > threshold) ? 255 : 0;
+		pixels[i * channels + 0] = value; // Blue
+		pixels[i * channels + 1] = value; // Green
+		pixels[i * channels + 2] = value; // Red
+		// Alpha 채널은 그대로 유지
 	}
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyDilation(unsigned char* pixels, int width, int height) {
-	std::vector<unsigned char> temp(width * height, 0);
-	// 전체 노드 순회하기 (4 - 연결성)
-	// 중심 픽셀 기준 커널 올려두기
-	for (int i = 1; i < height - 1; i++) {
-		for (int j = 1; j < width - 1; j++) {// 가로부터
-			int idx = i * width + j;
-			// 커널 단위로 처리, 가장자리는 빼고 안쪽만 처리	
-			// 모든 픽셀이 다 하얀색이면 흰색으로 , 하나라도 검은색이면 검은색으로 두기
-			if (pixels[idx] != 0) { //검은색이 아니면
-				temp[idx] = 255;
+	const int channels = 4;
+	const int stride = width * channels;
+	const int dataSize = stride * height;
+	std::vector<unsigned char> temp(dataSize);
+	memcpy(temp.data(), pixels, dataSize); // 원본 이미지를 temp에 복사
+
+	// 가장자리를 제외한 픽셀 순회
+	for (int y = 1; y < height - 1; y++) {
+		for (int x = 1; x < width - 1; x++) {
+			int current_idx = y * stride + x * channels;
+			unsigned char maxVal = 0;
+
+			// 3x3 커널 순회
+			for (int ky = -1; ky <= 1; ky++) {
+				for (int kx = -1; kx <= 1; kx++) {
+					int neighbor_idx = (y + ky) * stride + (x + kx) * channels;
+					// B 채널 값을 기준으로 가장 밝은 값을 찾음
+					if (temp[neighbor_idx] > maxVal) {
+						maxVal = temp[neighbor_idx];
+					}
+				}
 			}
+
+			// B, G, R 채널을 찾은 최대값으로 설정
+			pixels[current_idx + 0] = maxVal;
+			pixels[current_idx + 1] = maxVal;
+			pixels[current_idx + 2] = maxVal;
 		}
 	}
-	memcpy(pixels, temp.data(), width * height);
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyErosion(unsigned char* pixels, int width, int height) {
-	std::vector<unsigned char> temp(width * height, 255);
-	// 전체 노드 순회하기 (4 - 연결성)
-	// 중심 픽셀 기준 커널 올려두기
-	for (int i = 1; i < height - 1; i++) {
-		for (int j = 1; j < width - 1; j++) {// 가로부터
-			int idx = i * width + j;
-			// 커널 단위로 처리, 가장자리는 빼고 안쪽만 처리
-			if (pixels[idx] == 0) { //흰색이 아니면
-				temp[idx] = 0;
-			}
-		}
-	}
-	// 모든 픽셀이 다 하얀색이면 흰색으로 , 하나라도 검은색이면 검은색으로 두기
-	memcpy(pixels, temp.data(), width * height);
-}
-void NativeEngine::ImageProcessingEngine::ApplySobel(unsigned char* pixels, int width, int height) {
-	// 결과를 저장할 버퍼
-	std::vector<unsigned char> result(width * height, 0);
-	// x, y 방향 그래디언트를 임시 저장할 버퍼
-	std::vector<double> gradientX(width * height, 0);
-	std::vector<double> gradientY(width * height, 0);
+	const int channels = 4;
+	const int stride = width * channels;
+	const int dataSize = stride * height;
+	std::vector<unsigned char> temp(dataSize);
+	memcpy(temp.data(), pixels, dataSize); // 원본 이미지를 temp에 복사
 
-	// 수평 커널 (Gx)
-	int kernelX[3][3] = {
-		{-1, 0, 1},
-		{-2, 0, 2},
-		{-1, 0, 1}
-	};
+	// 가장자리를 제외한 픽셀 순회
+	for (int y = 1; y < height - 1; y++) {
+		for (int x = 1; x < width - 1; x++) {
+			int current_idx = y * stride + x * channels;
+			unsigned char minVal = 255;
 
-	// 수직 커널 (Gy)
-	int kernelY[3][3] = {
-		{ 1,  2,  1},
-		{ 0,  0,  0},
-		{-1, -2, -1}
-	};
-
-	// 경계 제외 컨볼루션 연산
-	for (int i = 1; i < height - 1; i++) {
-		for (int j = 1; j < width - 1; j++) {
-			double sumX = 0;
-			double sumY = 0;
-
-			for (int k = -1; k <= 1; k++) {
-				for (int m = -1; m <= 1; m++) {
-					int pixelVal = pixels[(i + k) * width + (j + m)];
-					sumX += pixelVal * kernelX[k + 1][m + 1];
-					sumY += pixelVal * kernelY[k + 1][m + 1];
+			// 3x3 커널 순회
+			for (int ky = -1; ky <= 1; ky++) {
+				for (int kx = -1; kx <= 1; kx++) {
+					int neighbor_idx = (y + ky) * stride + (x + kx) * channels;
+					// B 채널 값을 기준으로 가장 어두운 값을 찾음
+					if (temp[neighbor_idx] < minVal) {
+						minVal = temp[neighbor_idx];
+					}
 				}
 			}
-			gradientX[i * width + j] = sumX;
-			gradientY[i * width + j] = sumY;
+
+			// B, G, R 채널을 찾은 최소값으로 설정
+			pixels[current_idx + 0] = minVal;
+			pixels[current_idx + 1] = minVal;
+			pixels[current_idx + 2] = minVal;
+		}
+	}
+}
+void NativeEngine::ImageProcessingEngine::ApplySobel(unsigned char* pixels, int width, int height) {
+	const int channels = 4;
+	const int stride = width * channels;
+	const int pixel_count = width * height;
+
+	// 1. BGRA 이미지를 그레이스케일 임시 버퍼로 변환합니다.
+	std::vector<unsigned char> gray_pixels(pixel_count);
+	for (int i = 0; i < pixel_count; ++i) {
+		gray_pixels[i] = static_cast<unsigned char>(
+			0.114 * pixels[i * channels + 0] + // Blue
+			0.587 * pixels[i * channels + 1] + // Green
+			0.299 * pixels[i * channels + 2]   // Red
+			);
+	}
+
+	// 그래디언트와 최종 결과를 저장할 버퍼
+	std::vector<unsigned char> result(pixel_count, 0);
+	std::vector<double> gradientX(pixel_count, 0);
+	std::vector<double> gradientY(pixel_count, 0);
+
+	// 소벨 커널
+	int kernelX[3][3] = { {-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1} };
+	int kernelY[3][3] = { {1, 2, 1}, {0, 0, 0}, {-1, -2, -1} };
+
+	// 2. 그레이스케일 이미지에 컨볼루션 연산을 적용합니다.
+	for (int y = 1; y < height - 1; y++) {
+		for (int x = 1; x < width - 1; x++) {
+			double sumX = 0;
+			double sumY = 0;
+			for (int ky = -1; ky <= 1; ky++) {
+				for (int kx = -1; kx <= 1; kx++) {
+					int pixelVal = gray_pixels[(y + ky) * width + (x + kx)];
+					sumX += pixelVal * kernelX[ky + 1][kx + 1];
+					sumY += pixelVal * kernelY[ky + 1][kx + 1];
+				}
+			}
+			gradientX[y * width + x] = sumX;
+			gradientY[y * width + x] = sumY;
 		}
 	}
 
-	// 결과 magnitude 계산
-	for (int i = 1; i < height - 1; i++) {
-		for (int j = 1; j < width - 1; j++) {
-			double magnitude = sqrt(pow(gradientX[i * width + j], 2) + pow(gradientY[i * width + j], 2));
-			result[i * width + j] = static_cast<unsigned char>(std::clamp(magnitude, 0.0, 255.0));
-		}
+	// 3. 그래디언트 크기를 계산하여 최종 그레이스케일 결과를 만듭니다.
+	for (int i = 0; i < pixel_count; i++) {
+		double magnitude = sqrt(pow(gradientX[i], 2) + pow(gradientY[i], 2));
+		result[i] = static_cast<unsigned char>(std::clamp(magnitude, 0.0, 255.0));
 	}
 
-	// 경계 픽셀은 원본 유지
-	for (int i = 0; i < width; i++) {
-		result[i] = pixels[i];                          // top row
-		result[(height - 1) * width + i] = pixels[(height - 1) * width + i]; // bottom row
+	// 4. 그레이스케일 결과를 원본 BGRA 버퍼의 B, G, R 채널에 복사합니다.
+	for (int i = 0; i < pixel_count; ++i) {
+		pixels[i * channels + 0] = result[i]; // Blue
+		pixels[i * channels + 1] = result[i]; // Green
+		pixels[i * channels + 2] = result[i]; // Red
+		// Alpha 채널은 변경하지 않습니다.
 	}
-	for (int i = 0; i < height; i++) {
-		result[i * width] = pixels[i * width];          // left col
-		result[i * width + (width - 1)] = pixels[i * width + (width - 1)]; // right col
-	}
-
-	// 결과를 원본으로 복사
-	memcpy(pixels, result.data(), width * height);
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, int width, int height) {
-	std::vector<unsigned char> result(width * height, 0);
-	//라플라시안 커널
-	int kernel[3][3] = {
-		{0, 1, 0},
-		{1, -4, 1},
-		{0, 1, 0}
-	};
-	//패딩처리
+	const int channels = 4;
+	const int stride = width * channels;
+	const int pixel_count = width * height;
 
-	//중심 픽셀에 대한 계산
-	for (int j = 1; j < height - 1; j++) {
-		for (int i = 1; i < width - 1; i++) {
-			//주변 픽셀 정의
-			int current = pixels[j * width + i];
-			int up = pixels[(j - 1) * width + i];
-			int down = pixels[(j + 1) * width + i];
-			int left = pixels[j * width + (i - 1)];
-			int right = pixels[j * width + (i + 1)];
+	// 1. BGRA 이미지를 그레이스케일로 변환
+	std::vector<unsigned char> gray_pixels(pixel_count);
+	for (int i = 0; i < pixel_count; ++i) {
+		gray_pixels[i] = static_cast<unsigned char>(
+			0.114 * pixels[i * channels + 0] + // Blue
+			0.587 * pixels[i * channels + 1] + // Green
+			0.299 * pixels[i * channels + 2]   // Red
+			);
+	}
 
-			int temp = up + down + left + right - 4 * current;
-			result[j * width + i] = static_cast<unsigned char>(
-				std::clamp(temp, 0, 255)
-				);
+	// 2. 라플라시안 연산 결과를 저장할 버퍼 (음수 값 포함 가능)
+	std::vector<int> laplacian_result(pixel_count, 0);
+
+	// 3. 8-방향 라플라시안 커널을 적용하여 엣지 검출
+	//    (더 많은 방향의 엣지를 검출하여 4-방향보다 결과가 부드럽습니다.)
+	for (int y = 1; y < height - 1; y++) {
+		for (int x = 1; x < width - 1; x++) {
+			int current_idx = y * width + x;
+
+			int p1 = gray_pixels[(y - 1) * width + (x - 1)];
+			int p2 = gray_pixels[(y - 1) * width + x];
+			int p3 = gray_pixels[(y - 1) * width + (x + 1)];
+			int p4 = gray_pixels[y * width + (x - 1)];
+			int p5_current = gray_pixels[current_idx];
+			int p6 = gray_pixels[y * width + (x + 1)];
+			int p7 = gray_pixels[(y + 1) * width + (x - 1)];
+			int p8 = gray_pixels[(y + 1) * width + x];
+			int p9 = gray_pixels[(y + 1) * width + (x + 1)];
+
+			// 8-방향 라플라시안 연산: (주변 8개 픽셀 합) - 8 * 중앙값
+			int laplacian_val = (p1 + p2 + p3 + p4 + p6 + p7 + p8 + p9) - 8 * p5_current;
+
+			// 엣지를 시각화하기 위해 절댓값을 취함
+			laplacian_result[current_idx] = abs(laplacian_val);
 		}
 	}
-	memcpy(pixels, result.data(), width * height);
+
+	// 4. 결과 값을 0-255 범위로 정규화하여 가시성을 높임
+	int max_val = 0;
+	for (int val : laplacian_result) {
+		if (val > max_val) {
+			max_val = val;
+		}
+	}
+	// 0으로 나누는 오류 방지
+	if (max_val == 0) max_val = 1;
+
+	// 5. 정규화된 결과를 원본 BGRA 버퍼에 복사
+	for (int i = 0; i < pixel_count; ++i) {
+		// (현재 값 / 최댓값) * 255
+		unsigned char final_val = static_cast<unsigned char>((laplacian_result[i] * 255) / max_val);
+		pixels[i * channels + 0] = final_val; // Blue
+		pixels[i * channels + 1] = final_val; // Green
+		pixels[i * channels + 2] = final_val; // Red
+		// Alpha 채널은 그대로 유지
+	}
 }
+
 
 void NativeEngine::ImageProcessingEngine::ApplyTemplateMatch(
 	unsigned char* originalPixels, int originalWidth, int originalHeight,
 	unsigned char* templatePixels, int templateWidth, int templateHeight,
 	int* matchX, int* matchY)
 {
-	//전체 순회하기
-	std::vector<unsigned int> result(originalWidth * originalHeight);
-	int temp = 0;
-	int min = 256;
-	for (int j = 0; j < originalHeight - templateHeight; j++) {
-		for (int i = 0; i < originalWidth - templateWidth; i++) { // 가로 -> 세로 순서
+	const int channels = 4;
 
-			for (int tj = 0; tj < templateHeight; tj++) {
-				for (int ti = 0; ti < templateWidth; ti++) {
-					// 픽셀 접근
-					int origIdx = (j + tj) * originalWidth + (i + ti);
-					int tempIdx = tj * templateWidth + ti;
+	// 1. 원본 이미지를 그레이스케일로 변환
+	int original_pixel_count = originalWidth * originalHeight;
+	std::vector<unsigned char> original_gray(original_pixel_count);
+	for (int i = 0; i < original_pixel_count; ++i) {
+		original_gray[i] = static_cast<unsigned char>(
+			(originalPixels[i * channels] + originalPixels[i * channels + 1] + originalPixels[i * channels + 2]) / 3.0
+			);
+	}
 
-					temp = abs(originalPixels[origIdx] - templatePixels[tempIdx]);
-					result[origIdx] = temp;
+	// 2. 템플릿 이미지를 그레이스케일로 변환
+	int template_pixel_count = templateWidth * templateHeight;
+	std::vector<unsigned char> template_gray(template_pixel_count);
+	for (int i = 0; i < template_pixel_count; ++i) {
+		template_gray[i] = static_cast<unsigned char>(
+			(templatePixels[i * channels] + templatePixels[i * channels + 1] + templatePixels[i * channels + 2]) / 3.0
+			);
+	}
 
-					if (temp < min) {
-						min = temp;
-						*matchX = i;
-						*matchY = j;
-					}
+	long long minSAD = -1; // SAD(절대차 합계)의 최솟값을 저장할 변수
+	*matchX = -1;
+	*matchY = -1;
+
+	// 3. 그레이스케일 이미지 위에서 템플릿 매칭 수행
+	for (int y = 0; y <= originalHeight - templateHeight; y++) {
+		for (int x = 0; x <= originalWidth - templateWidth; x++) {
+			long long currentSAD = 0;
+
+			// 템플릿 영역을 순회하며 SAD 계산
+			for (int ty = 0; ty < templateHeight; ty++) {
+				for (int tx = 0; tx < templateWidth; tx++) {
+					int original_idx = (y + ty) * originalWidth + (x + tx);
+					int template_idx = ty * templateWidth + tx;
+
+					currentSAD += abs(original_gray[original_idx] - template_gray[template_idx]);
 				}
+			}
+
+			// SAD 값이 가장 작은 위치를 최적의 매칭 위치로 간주
+			if (minSAD == -1 || currentSAD < minSAD) {
+				minSAD = currentSAD;
+				*matchX = x;
+				*matchY = y;
 			}
 		}
 	}
 }
 
 void fft1d(vector<complex<double>>& data, bool inverse = false) {
-	int num = data.size();
-	if (num <= 1) return;
+	int n = data.size();
+	if (n <= 1) return;
 
-	// 짝수/홀수 분리
-	vector<complex<double>> even(num / 2), odd(num / 2);
-	for (int i = 0; i < num / 2; i++) {
-		even[i] = data[2 * i];
-		odd[i] = data[2 * i + 1];
+	// 비트 반전 순서로 데이터 재정렬
+	for (int i = 1, j = 0; i < n; i++) {
+		int bit = n >> 1;
+		for (; j & bit; bit >>= 1)
+			j ^= bit;
+		j ^= bit;
+		if (i < j)
+			swap(data[i], data[j]);
 	}
 
-	// 재귀 호출
-	fft1d(even, inverse);
-	fft1d(odd, inverse);
-
-	// 결합 (버터플라이)
-	for (int i = 0; i < num / 2; i++) {
-		double angle = (inverse ? 2 : -2) * std::numbers::pi * i / num;
-		complex<double> w(cos(angle), sin(angle));
-		data[i] = even[i] + w * odd[i];
-		data[i + num / 2] = even[i] - w * odd[i];
-	}
-
-	// IFFT일 경우 결과를 n으로 나누기
-	if (inverse) {
-		for (auto& i : data) i /= 2.0;
-	}
-}
-
-bool NativeEngine::ImageProcessingEngine:: ApplyFFT(unsigned char* pixels, int width, int height) {
-	// 2D 데이터를 복소수 벡터로 변환
-	_fftData.assign(height, vector<complex<double>>(width));
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
-			_fftData[j][i] = complex<double>(pixels[j * width + i], 0.0);
+	// 버터플라이 연산
+	for (int len = 2; len <= n; len <<= 1) {
+		double ang = 2 * std::numbers::pi / len * (inverse ? -1 : 1);
+		complex<double> wlen(cos(ang), sin(ang));
+		for (int i = 0; i < n; i += len) {
+			complex<double> w(1);
+			for (int j = 0; j < len / 2; j++) {
+				complex<double> u = data[i + j];
+				complex<double> v = data[i + j + len / 2] * w;
+				data[i + j] = u + v;
+				data[i + j + len / 2] = u - v;
+				w *= wlen;
+			}
 		}
 	}
 
-	// 행별 FFT
+	// IFFT일 경우 크기 보정
+	if (inverse) {
+		for (auto& val : data) {
+			val /= n;
+		}
+	}
+}
+
+//shift 가 빠짐!
+void NativeEngine::ImageProcessingEngine::fftShift() {
+	int height = _fftData.size();
+	int width = _fftData[0].size();
+	int cx = width / 2;
+	int cy = height / 2;
+
+	for (int y = 0; y < cy; y++) {
+		for (int x = 0; x < cx; x++) {
+			swap(_fftData[y][x], _fftData[y + cy][x + cx]);
+			swap(_fftData[y + cy][x], _fftData[y][x + cx]);
+		}
+	}
+}
+
+//패딩연산은 그냥 함수로 빼기
+int nextPowerOf2(int n) {
+	int p = 1;
+	while (p < n) p <<= 1;
+	return p;
+}
+
+bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int width, int height) {
+	const int channels = 4; // BGRA
+	_fftData.assign(height, vector<complex<double>>(width));
+
+	// 1. BGRA → Grayscale 변환
+	for (int j = 0; j < height; j++) {
+		for (int i = 0; i < width; i++) {
+			int idx = (j * width + i) * channels;
+			unsigned char b = pixels[idx + 0];
+			unsigned char g = pixels[idx + 1];
+			unsigned char r = pixels[idx + 2];
+			double gray = 0.114 * b + 0.587 * g + 0.299 * r;
+			_fftData[j][i] = complex<double>(gray, 0.0);
+		}
+	}
+
+	// 2. 행별 FFT
 	for (int j = 0; j < height; j++)
 		fft1d(_fftData[j], false);
 
-	// 열별 FFT
+	// 3. 열별 FFT
 	for (int i = 0; i < width; i++) {
 		vector<complex<double>> col(height);
 		for (int j = 0; j < height; j++)
@@ -329,12 +530,32 @@ bool NativeEngine::ImageProcessingEngine:: ApplyFFT(unsigned char* pixels, int w
 		for (int j = 0; j < height; j++)
 			_fftData[j][i] = col[j];
 	}
+	_fftDataBackup = _fftData;
 
-	// 결과 저장 (크기 값으로 시각화)
+	// 4. FFT Shift (스펙트럼 중앙 정렬)
+	fftShift();
+
+	// 5. 로그 스케일링
+	double max_val = 0.0;
+	vector<vector<double>> mag(height, vector<double>(width));
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
-			double mag = abs(_fftData[j][i]);
-			pixels[j * width + i] = static_cast<unsigned char>(std::clamp(mag, 0.0, 255.0));
+			double val = log(1.0 + abs(_fftData[j][i]));
+			mag[j][i] = val;
+			if (val > max_val) max_val = val;
+		}
+	}
+
+	// 6. 0~255 정규화해서 BGRA 출력
+	if (max_val == 0) max_val = 1.0;
+	for (int j = 0; j < height; j++) {
+		for (int i = 0; i < width; i++) {
+			unsigned char v = static_cast<unsigned char>((mag[j][i] / max_val) * 255.0);
+			int idx = (j * width + i) * channels;
+			pixels[idx + 0] = v; // B
+			pixels[idx + 1] = v; // G
+			pixels[idx + 2] = v; // R
+			// Alpha는 그대로 둠
 		}
 	}
 
@@ -342,37 +563,53 @@ bool NativeEngine::ImageProcessingEngine:: ApplyFFT(unsigned char* pixels, int w
 }
 
 bool NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int width, int height) {
-	if (_fftData.empty()) return false;
+	if (_fftDataBackup.empty()) return false;
 
-	// 행별 IFFT
-	for (int j = 0; j < height; j++)
-		fft1d(_fftData[j], true);
+	const int channels = 4;
+	// 패딩된 데이터의 크기를 가져옴
+	const int padHeight = _fftDataBackup.size();
+	const int padWidth = _fftDataBackup[0].size();
 
-	// 열별 IFFT
-	for (int i = 0; i < width; i++) {
-		vector<complex<double>> col(height);
-		for (int j = 0; j < height; j++)
-			col[j] = _fftData[j][i];
+	// 1. 백업해 둔 Shift 되기 전의 순수 FFT 데이터를 사용
+	_fftData = _fftDataBackup;
+
+	// 2. 2D IFFT 수행 (행 -> 열 순서)
+	for (int y = 0; y < padHeight; y++) fft1d(_fftData[y], true);
+	for (int x = 0; x < padWidth; x++) {
+		vector<complex<double>> col(padHeight);
+		for (int y = 0; y < padHeight; y++) col[y] = _fftData[y][x];
 		fft1d(col, true);
-		for (int j = 0; j < height; j++)
-			_fftData[j][i] = col[j];
+		for (int y = 0; y < padHeight; y++) _fftData[y][x] = col[y];
 	}
 
-	// 결과 저장 (실수부)
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
-			double val = _fftData[j][i].real();
-			pixels[j * width + i] = static_cast<unsigned char>(std::clamp(val, 0.0, 255.0));
+	// 3. 복원된 데이터를 원본 이미지 크기(width, height)에 맞게 잘라서 저장
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			// 실수부만 가져와서 픽셀 값으로 사용
+			double val = _fftData[y][x].real();
+			unsigned char gray = static_cast<unsigned char>(std::clamp(round(val), 0.0, 255.0));
+
+			int idx = (y * width + x) * channels;
+			pixels[idx + 0] = gray; // B
+			pixels[idx + 1] = gray; // G
+			pixels[idx + 2] = gray; // R
 		}
 	}
+
+	// 사용이 끝난 백업 데이터는 초기화
+	_fftDataBackup.clear();
+	_fftData.clear();
 
 	return true;
 }
 
+
+
 void NativeEngine::ImageProcessingEngine::ClearFFTData() {
+	_fftDataBackup.clear();
 	_fftData.clear();
 }
 
-bool NativeEngine::ImageProcessingEngine::HasFFTData(){
-	return !_fftData.empty() && !_fftData[0].empty();
+bool NativeEngine::ImageProcessingEngine::HasFFTData() {
+	return !_fftDataBackup.empty() && !_fftDataBackup[0].empty();
 }
