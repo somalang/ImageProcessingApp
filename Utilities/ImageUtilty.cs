@@ -21,7 +21,7 @@ namespace ImageProcessing.Utilities
             }
         }
         // 메모리 주소를 가지고 fft 주고받기
-        ㅎ
+        
         // Bitmap을 BitmapSource로 변환하는 메서드 (새로 추가)
         public static BitmapSource BitmapToBitmapSource(Bitmap bitmap)
         {

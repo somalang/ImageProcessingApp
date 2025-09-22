@@ -19,7 +19,7 @@ namespace ImageProcessing.Services
 
         public bool CanUndo => _undoStack.Any();
         public bool CanRedo => _redoStack.Any();
-        public bool HasFFTData => _engine.HasFFTData();
+        public bool HasFFTData() => _engine.HasFFTData();
 
         private void AddToUndoStack(BitmapImage image)
         {
@@ -174,7 +174,7 @@ namespace ImageProcessing.Services
 
         public BitmapImage ApplyIFFT(BitmapImage source)
         {
-            if (!HasFFTData)
+            if (!HasFFTData())
             {
                 MessageBox.Show("FFT 데이터가 없습니다.", "경고", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return source;

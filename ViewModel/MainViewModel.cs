@@ -69,7 +69,10 @@ namespace ImageProcessing.ViewModel
         // 이미지 관련 속성
         public BitmapImage CurrentBitmapImage
         {
-            get => currentBitmapImage;
+            get
+            {
+                return currentBitmapImage;
+            }
             set
             {
                 if (SetProperty(ref currentBitmapImage, value))
@@ -83,7 +86,10 @@ namespace ImageProcessing.ViewModel
 
         public BitmapImage LoadedImage
         {
-            get => loadedImage;
+            get
+            {
+                return loadedImage;
+            }
             set
             {
                 if (SetProperty(ref loadedImage, value))
@@ -96,26 +102,40 @@ namespace ImageProcessing.ViewModel
         // 선택 영역 및 좌표 속성
         public Visibility SelectionVisibility
         {
-            get => selectionVisibility;
-            set => SetProperty(ref selectionVisibility, value);
+            get { 
+                return selectionVisibility; 
+            }
+            set { 
+                 SetProperty(ref selectionVisibility, value); 
+            } 
         }
 
         public Rect SelectionRect
         {
-            get => selectionRect;
-            set => SetProperty(ref selectionRect, value);
+            get { 
+                return selectionRect;
+            } 
+            set { 
+                SetProperty(ref selectionRect, value); 
+            } 
         }
 
         public string CurrentCoordinates
         {
-            get => currentCoordinates;
-            set => SetProperty(ref currentCoordinates, value);
+            get { 
+                return currentCoordinates; 
+            } 
+            set { 
+                SetProperty(ref currentCoordinates, value); 
+            } 
         }
 
         // UI 및 상태 속성
         public Size ImageControlSize
         {
-            get => imageControlSize;
+            get {
+            return imageControlSize;
+            } 
             set
             {
                 if (SetProperty(ref imageControlSize, value))
@@ -129,13 +149,19 @@ namespace ImageProcessing.ViewModel
 
         public string ProcessingTime
         {
-            get => processingTime;
-            set => SetProperty(ref processingTime, value);
+            get { 
+                return processingTime; 
+            } 
+            set {
+                SetProperty(ref processingTime, value);
+            } 
         }
 
         public double ZoomLevel
         {
-            get => zoomLevel;
+            get {
+                return zoomLevel;
+            } 
             set
             {
                 if (SetProperty(ref zoomLevel, value))
@@ -149,12 +175,21 @@ namespace ImageProcessing.ViewModel
 
 
 
-        public string ZoomPercentage => $"{ZoomLevel * 100:0}%";
+        public string ZoomPercentage
+        {
+            get
+            {
+                return $"{ZoomLevel * 100:0}%";
+            }
+        }
+
         private double? previousZoomLevelForDoubleClick = null;
 
         public BitmapSource PreviewImage
         {
-            get => _previewImage;
+            get {
+                return _previewImage;
+            } 
             set
             {
                 _previewImage = value;
@@ -162,24 +197,48 @@ namespace ImageProcessing.ViewModel
                 OnPropertyChanged(nameof(PreviewVisibility)); // 프리뷰 창의 보임/숨김 상태도 갱신
             }
         }
-        public Visibility PreviewVisibility => PreviewImage != null ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility PreviewVisibility
+        {
+            get
+            {
+                return PreviewImage != null ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
 
         // 설정 관련 속성
         public AppSettings AppSettings
         {
-            get => _appSettings;
-            set => SetProperty(ref _appSettings, value);
+            get {
+                return _appSettings;
+            } 
+            set {
+                SetProperty(ref _appSettings, value);
+            } 
         }
 
         public FilterParameters FilterParameters
         {
-            get => _filterParameters;
-            set => SetProperty(ref _filterParameters, value);
+            get {
+                return _filterParameters;
+            } 
+            set {
+                SetProperty(ref _filterParameters, value);
+            } 
         }
 
         // Undo/Redo 상태
-        public bool CanUndo => _imageProcessor.CanUndo;
-        public bool CanRedo => _imageProcessor.CanRedo;
+        public bool CanUndo {
+            get
+            {
+                return _imageProcessor.CanUndo;
+            }
+        } 
+        public bool CanRedo {
+            get
+            {
+                return _imageProcessor.CanRedo;
+            }
+        } 
 
         // Command 속성
         public ICommand LoadImageCommand { get; private set; }
@@ -215,13 +274,11 @@ namespace ImageProcessing.ViewModel
         #region Constructor
         public MainViewModel()
         {
-            //imageProcessor = new ImageProcessor();
+            _imageProcessor = new ImageProcessor();
             fileService = new FileService();
             settingService = new SettingService();
             logService = new LogService();
             clipboardService = new ClipboardService();
-            _imageProcessor = new ImageProcessor();
-            //_gpuImageProcessor = new GPUImageProcessor();
 
             lastImagePath = settingService.GetLastImagePath();
             ProcessingTime = "Process Time: 0 ms";
@@ -283,58 +340,230 @@ namespace ImageProcessing.ViewModel
         #endregion
 
         #region Private Methods
+
         private void InitializeCommands()
         {
-            LoadImageCommand = new RelayCommand(async _ => await LoadImageAsync());
-            SaveImageCommand = new RelayCommand(async _ => await SaveImageAsync(), _ => CurrentBitmapImage != null);
+            LoadImageCommand = new RelayCommand(OnLoadImage, CanAlways);
+            SaveImageCommand = new RelayCommand(OnSaveImage, CanProcessImage);
 
-            ApplyGrayscaleCommand = new RelayCommand(_ => ApplyFilter(() => 
-            _imageProcessor.ApplyGrayscale(currentBitmapImage),"GrayScale"));
+            ApplyGrayscaleCommand = new RelayCommand(OnApplyGrayscale, CanProcessImage); 
+            ApplySobelCommand = new RelayCommand(OnApplySobel, CanProcessImage);
+            ApplyLaplacianCommand = new RelayCommand(OnApplyLaplacian, CanProcessImage);
+            ApplyGaussianBlurCommand = new RelayCommand(OnApplyGaussianBlur, CanProcessImage);
+            ApplyBinarizationCommand = new RelayCommand(OnApplyBinarization, CanProcessImage);
+            ApplyDilationCommand = new RelayCommand(OnApplyDilation, CanProcessImage);
+            ApplyErosionCommand = new RelayCommand(OnApplyErosion, CanProcessImage);
+            ApplyMedianFilterCommand = new RelayCommand(OnApplyMedianFilter, CanProcessImage);
 
-            // 2. 나머지 필터들은 모두 기존의 CPU 방식(_imageProcessor)으로 되돌립니다.
-            ApplySobelCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplySobel(CurrentBitmapImage), "Sobel"));
+            FFTCommand = new RelayCommand(OnExecuteFFT, CanProcessImage);
+            IFFTCommand = new RelayCommand(OnApplyIFFT, CanApplyIFFT);
 
-            ApplyLaplacianCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyLaplacian(CurrentBitmapImage, FilterParameters.LaplacianKernelType), "Laplacian"));
+            UndoCommand = new RelayCommand(OnExecuteUndo, CanUndoPredicate);
+            RedoCommand = new RelayCommand(OnExecuteRedo, CanRedoPredicate);
 
-            ApplyGaussianBlurCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyGaussianBlur(CurrentBitmapImage, (float)FilterParameters.GaussianSigma), "Gaussian Blur"));
+            ShowOriginalImageCommand = new RelayCommand(OnShowOriginalImage, CanShowOriginal);
+            DeleteImageCommand = new RelayCommand(OnDeleteImage, CanProcessImage);
+            ReloadImageCommand = new RelayCommand(OnReloadImage, CanReload);
 
-            ApplyBinarizationCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyBinarization(CurrentBitmapImage, FilterParameters.BinarizationThreshold), "Binarization"));
+            ExitCommand = new RelayCommand(OnExitApplication, CanAlways);
+            ShowLogWindowCommand = new RelayCommand(OnShowLogWindow, CanAlways);
 
-            ApplyDilationCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyDilation(CurrentBitmapImage, FilterParameters.DilationKernelSize), "Dilation"));
+            CutSelectionCommand = new RelayCommand(OnCutSelection, HasValidSelectionPredicate);
+            CopySelectionCommand = new RelayCommand(OnCopySelection, HasValidSelectionPredicate);
+            DeleteSelectionCommand = new RelayCommand(OnDeleteSelection, HasValidSelectionPredicate);
+            PasteCommand = new RelayCommand(OnPaste, CanPaste);
 
-            ApplyErosionCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyErosion(CurrentBitmapImage, FilterParameters.ErosionKernelSize), "Erosion"));
+            TemplateMatchCommand = new RelayCommand(OnTemplateMatch, CanProcessImage);
+            OpenSettingsCommand = new RelayCommand(OnOpenSettings, CanAlways);
+            GenerateReportCommand = new RelayCommand(OnGenerateReport, CanProcessImage);
 
-            ApplyMedianFilterCommand = new RelayCommand(_ => ApplyFilter(() =>
-                _imageProcessor.ApplyMedian(CurrentBitmapImage, FilterParameters.MedianKernelSize), "Median Filter"));
-
-            FFTCommand = new RelayCommand(_ => ExecuteFFT(), _ => CurrentBitmapImage != null);
-            IFFTCommand = new RelayCommand(_ => ApplyIFFT(), _ => CurrentBitmapImage != null && _imageProcessor.HasFFTData);
-
-            UndoCommand = new RelayCommand(_ => ExecuteUndo(), _ => CanUndo);
-            RedoCommand = new RelayCommand(_ => ExecuteRedo(), _ => CanRedo);
-            ShowOriginalImageCommand = new RelayCommand(_ => ShowOriginalImage(), _ => originalImage != null);
-            DeleteImageCommand = new RelayCommand(_ => DeleteImage(), _ => CurrentBitmapImage != null);
-            ReloadImageCommand = new RelayCommand(async _ => await ReloadImageAsync(), _ => originalImage != null || !string.IsNullOrEmpty(lastImagePath));
-            ExitCommand = new RelayCommand(_ => Application.Current.Shutdown());
-            ShowLogWindowCommand = new RelayCommand(_ => ShowLogWindow());
-
-            CutSelectionCommand = new RelayCommand(_ => CutSelection(), _ => HasValidSelection());
-            CopySelectionCommand = new RelayCommand(_ => CopySelection(), _ => HasValidSelection());
-            DeleteSelectionCommand = new RelayCommand(_ => DeleteSelection(), _ => HasValidSelection());
-            PasteCommand = new RelayCommand(_ => ExecutePaste(), _ => CurrentBitmapImage != null && clipboardService.GetImage() != null);
-            TemplateMatchCommand = new RelayCommand(async _ => await ExecuteTemplateMatchAsync(), _ => CurrentBitmapImage != null);
-            OpenSettingsCommand = new RelayCommand(_ => ShowSettingsWindow());
-            GenerateReportCommand = new RelayCommand(_ => ShowAnalysisReport(), _ => CurrentBitmapImage != null);
-
-            ZoomInCommand = new RelayCommand(_ => ZoomLevel += ZOOM_STEP);
-            ZoomOutCommand = new RelayCommand(_ => ZoomLevel -= ZOOM_STEP);
+            ZoomInCommand = new RelayCommand(OnZoomIn, CanAlways);
+            ZoomOutCommand = new RelayCommand(OnZoomOut, CanAlways);
         }
+        private bool CanAlways(object parameter)
+        {
+            return true;
+        }
+
+        private bool CanProcessImage(object parameter)
+        {
+            return CurrentBitmapImage != null;
+        }
+
+        private bool CanApplyIFFT(object parameter)
+        {
+            return CurrentBitmapImage != null && _imageProcessor.HasFFTData();
+        }
+
+        private bool CanUndoPredicate(object parameter)
+        {
+            return CanUndo;
+        }
+
+        private bool CanRedoPredicate(object parameter)
+        {
+            return CanRedo;
+        }
+
+        private bool CanShowOriginal(object parameter)
+        {
+            return originalImage != null;
+        }
+
+        private bool CanReload(object parameter)
+        {
+            return originalImage != null || !string.IsNullOrEmpty(lastImagePath);
+        }
+
+        private bool HasValidSelectionPredicate(object parameter)
+        {
+            return HasValidSelection();
+        }
+
+        private bool CanPaste(object parameter)
+        {
+            return CurrentBitmapImage != null && clipboardService.GetImage() != null;
+        }
+        private async void OnLoadImage(object parameter)
+        {
+            await LoadImageAsync();
+        }
+
+        private async void OnSaveImage(object parameter)
+        {
+            await SaveImageAsync();
+        }
+
+        private void OnApplyGrayscale(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyGrayscale(CurrentBitmapImage), "GrayScale");
+        }
+
+        private void OnApplySobel(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplySobel(CurrentBitmapImage), "Sobel");
+        }
+
+        private void OnApplyLaplacian(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyLaplacian(CurrentBitmapImage, FilterParameters.LaplacianKernelType), "Laplacian");
+        }
+
+        private void OnApplyGaussianBlur(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyGaussianBlur(CurrentBitmapImage, (float)FilterParameters.GaussianSigma), "Gaussian Blur");
+        }
+
+        private void OnApplyBinarization(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyBinarization(CurrentBitmapImage, FilterParameters.BinarizationThreshold), "Binarization");
+        }
+
+        private void OnApplyDilation(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyDilation(CurrentBitmapImage, FilterParameters.DilationKernelSize), "Dilation");
+        }
+
+        private void OnApplyErosion(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyErosion(CurrentBitmapImage, FilterParameters.ErosionKernelSize), "Erosion");
+        }
+
+        private void OnApplyMedianFilter(object parameter)
+        {
+            ApplyFilter(() => _imageProcessor.ApplyMedian(CurrentBitmapImage, FilterParameters.MedianKernelSize), "Median Filter");
+        }
+
+        private void OnExecuteFFT(object parameter)
+        {
+            ExecuteFFT();
+        }
+
+        private void OnApplyIFFT(object parameter)
+        {
+            ApplyIFFT();
+        }
+
+        private void OnExecuteUndo(object parameter)
+        {
+            ExecuteUndo();
+        }
+
+        private void OnExecuteRedo(object parameter)
+        {
+            ExecuteRedo();
+        }
+
+        private void OnShowOriginalImage(object parameter)
+        {
+            ShowOriginalImage();
+        }
+
+        private void OnDeleteImage(object parameter)
+        {
+            DeleteImage();
+        }
+
+        private async void OnReloadImage(object parameter)
+        {
+            await ReloadImageAsync();
+        }
+
+        private void OnExitApplication(object parameter)
+        {
+            Application.Current.Shutdown();
+        }
+
+        private void OnShowLogWindow(object parameter)
+        {
+            ShowLogWindow();
+        }
+
+        private void OnCutSelection(object parameter)
+        {
+            CutSelection();
+        }
+
+        private void OnCopySelection(object parameter)
+        {
+            CopySelection();
+        }
+
+        private void OnDeleteSelection(object parameter)
+        {
+            DeleteSelection();
+        }
+
+        private void OnPaste(object parameter)
+        {
+            ExecutePaste();
+        }
+
+        private async void OnTemplateMatch(object parameter)
+        {
+            await ExecuteTemplateMatchAsync();
+        }
+
+        private void OnOpenSettings(object parameter)
+        {
+            ShowSettingsWindow();
+        }
+
+        private void OnGenerateReport(object parameter)
+        {
+            ShowAnalysisReport();
+        }
+
+        private void OnZoomIn(object parameter)
+        {
+            ZoomLevel += ZOOM_STEP;
+        }
+
+        private void OnZoomOut(object parameter)
+        {
+            ZoomLevel -= ZOOM_STEP;
+        }
+
 
         private void InitializeBaseScale(Size controlSize, BitmapSource originalImage)
         {
@@ -582,6 +811,7 @@ namespace ImageProcessing.ViewModel
 
         private void ApplyFilter(Func<BitmapImage> filterAction, string operationName)
         {
+            ResetSelection(); 
             if (CurrentBitmapImage == null) return;
 
             var stopwatch = Stopwatch.StartNew();
@@ -611,7 +841,7 @@ namespace ImageProcessing.ViewModel
 
         private void ApplyIFFT()
         {
-            if (!_imageProcessor.HasFFTData)
+            if (!_imageProcessor.HasFFTData())
             {
                 MessageBox.Show("FFT 데이터가 없습니다. 먼저 푸리에 변환을 수행해주세요.", "경고", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -654,7 +884,7 @@ namespace ImageProcessing.ViewModel
                 stopwatch.Stop();
 
                 // FFT 결과가 성공적으로 생성되었는지 확인
-                if (fftResult != null && _imageProcessor.HasFFTData)
+                if (fftResult != null && _imageProcessor.HasFFTData())
                 {
                     // 새로운 FFT 결과 이미지로 업데이트
                     CurrentBitmapImage = fftResult;

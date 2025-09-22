@@ -1,5 +1,13 @@
 #pragma once
 
+#include <iostream>
+#include <cmath>
+#include <numbers>
+#include <vector>
+#include <complex>
+#include <algorithm>
+#include <cstring>
+
 #ifdef IMAGEPROCESSINGENGINEAPP_EXPORTS
 #define ENGINE_API __declspec(dllexport)
 #else
@@ -13,6 +21,7 @@ namespace NativeEngine {
 		//상수
 		//필드
 		//속성
+		std::vector<std::vector<std::complex<double>>> _fftData;
 		//생성자
 		//퍼블릭 메서드
 	public:
@@ -25,8 +34,8 @@ namespace NativeEngine {
 		void ApplySobel(unsigned char* pixels, int width, int height);
 		void ApplyLaplacian(unsigned char* pixels, int width, int height);
 		void ApplyTemplateMatch(unsigned char* originalPixels, int width, int height, unsigned char* templatePixels, int templateWidth, int templateHeight, int* matchX, int* matchY);
-		void ApplyFFT(unsigned char* data, int width, int height);
-		void ApplyIFFT(unsigned char* data, int width, int height);
+		bool ApplyFFT(unsigned char* data, int width, int height);
+		bool ApplyIFFT(unsigned char* data, int width, int height);
 		void ClearFFTData();
 		bool HasFFTData();
 

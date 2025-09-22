@@ -2,8 +2,6 @@
 #include "ImageProcessingWrapper.h"
 #include "ImageProcessingEngineApp.h"
 using namespace ImageProcessingWrapper;
-//래퍼함수 하나 만들어서 중복한 거 빼기
-
 
 void ImageEngine::ApplyGrayscale(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
@@ -54,18 +52,19 @@ void ImageEngine::ApplyTemplateMatch(array<System::Byte>^ originalPixels, int wi
     _nativeEngine->ApplyTemplateMatch(p, width, height, t,  templateWidth, templateHeight, px, py);
 }
 
-void ImageEngine::ApplyFFT(array<System::Byte>^ pixels, int width, int height) {
+bool ImageEngine::ApplyFFT(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    _nativeEngine->ApplyFFT(p, width, height);
+    return _nativeEngine->ApplyFFT(p, width, height);
 }
 
-void ImageEngine::ApplyIFFT(array<System::Byte>^ pixels, int width, int height) {
+bool ImageEngine::ApplyIFFT(array<System::Byte>^ pixels, int width, int height) {
     pin_ptr<unsigned char> p = &pixels[0];
-    _nativeEngine->ApplyIFFT(p, width, height);
+    return _nativeEngine->ApplyIFFT(p, width, height);
 }
+
 void ImageEngine::ClearFFTData() {
     _nativeEngine->ClearFFTData();
 }
 bool ImageEngine::HasFFTData() {
-    _nativeEngine->ClearFFTData();
+    return _nativeEngine->HasFFTData();
 }

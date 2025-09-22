@@ -1,11 +1,5 @@
-﻿#include <iostream>
-#include <cmath>
-#include <numbers>
-#include <vector>
-#include <complex>
-#include <algorithm>
-#include <cstring>
-#include "ImageProcessingEngineApp.h"
+﻿#include "ImageProcessingEngineApp.h"
+
 using namespace std;
 
 void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, int width, int height) {
@@ -15,13 +9,13 @@ void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, 
 	unsigned int red, blue, green;
 
 	for (int i = 0; i < width * height; i++) {
-		red = pixels[i * 3 + 0];
-		green = pixels[i * 3 + 1];
-		blue = pixels[i * 3 + 2];
+		red = pixels[i * 4 + 0];
+		green = pixels[i * 4 + 1];
+		blue = pixels[i * 4 + 2];
 		avg = (red + green + blue) / 3;
-		pixels[i * 3 + 0] = avg;
-		pixels[i * 3 + 1] = avg;
-		pixels[i * 3 + 2] = avg;
+		pixels[i * 4 + 0] = avg;
+		pixels[i * 4 + 1] = avg;
+		pixels[i * 4 + 2] = avg;
 	}
 }
 
@@ -313,71 +307,72 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 	}
 }
 
-void NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int width, int height) {
+bool NativeEngine::ImageProcessingEngine:: ApplyFFT(unsigned char* pixels, int width, int height) {
 	// 2D 데이터를 복소수 벡터로 변환
-	vector<vector<complex<double>>> data(height, vector<complex<double>>(width));
-	for (int j = 0; j < height; j++)
-		for (int i = 0; i < width; i++)
-			data[j][i] = complex<double>(pixels[j * width + i], 0.0);
+	_fftData.assign(height, vector<complex<double>>(width));
+	for (int j = 0; j < height; j++) {
+		for (int i = 0; i < width; i++) {
+			_fftData[j][i] = complex<double>(pixels[j * width + i], 0.0);
+		}
+	}
 
-	// 행별 1D FFT
+	// 행별 FFT
 	for (int j = 0; j < height; j++)
-		fft1d(data[j], false);
+		fft1d(_fftData[j], false);
 
-	// 열별 1D FFT
+	// 열별 FFT
 	for (int i = 0; i < width; i++) {
 		vector<complex<double>> col(height);
 		for (int j = 0; j < height; j++)
-			col[j] = data[j][i];
+			col[j] = _fftData[j][i];
 		fft1d(col, false);
 		for (int j = 0; j < height; j++)
-			data[j][i] = col[j];
+			_fftData[j][i] = col[j];
 	}
 
-	// 결과 저장
+	// 결과 저장 (크기 값으로 시각화)
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
-			double mag = abs(data[j][i]);
-			pixels[j * width + i] = static_cast<unsigned char>(clamp(mag, 0.0, 255.0));
+			double mag = abs(_fftData[j][i]);
+			pixels[j * width + i] = static_cast<unsigned char>(std::clamp(mag, 0.0, 255.0));
 		}
 	}
 
+	return !_fftData.empty() && !_fftData[0].empty();
 }
 
-void NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int width, int height) {
-	// 2D 데이터를 복소수 벡터로 변환
-	vector<vector<complex<double>>> data(height, vector<complex<double>>(width));
-	for (int j = 0; j < height; j++)
-		for (int i = 0; i < width; i++)
-			data[j][i] = complex<double>(pixels[j * width + i], 0.0);
+bool NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int width, int height) {
+	if (_fftData.empty()) return false;
 
-	// 행연산
+	// 행별 IFFT
 	for (int j = 0; j < height; j++)
-		fft1d(data[j], true);
+		fft1d(_fftData[j], true);
 
-	// 열연산
+	// 열별 IFFT
 	for (int i = 0; i < width; i++) {
 		vector<complex<double>> col(height);
 		for (int j = 0; j < height; j++)
-			col[j] = data[j][i];
+			col[j] = _fftData[j][i];
 		fft1d(col, true);
 		for (int j = 0; j < height; j++)
-			data[j][i] = col[j];
+			_fftData[j][i] = col[j];
 	}
 
-	// 결과 저장
+	// 결과 저장 (실수부)
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
-			double val = data[j][i].real();
-			pixels[j * width + i] = static_cast<unsigned char>(clamp(val, 0.0, 255.0));
+			double val = _fftData[j][i].real();
+			pixels[j * width + i] = static_cast<unsigned char>(std::clamp(val, 0.0, 255.0));
 		}
 	}
+
+	return true;
 }
 
 void NativeEngine::ImageProcessingEngine::ClearFFTData() {
-
+	_fftData.clear();
 }
 
-bool NativeEngine::ImageProcessingEngine::HasFFTData() {
-
+bool NativeEngine::ImageProcessingEngine::HasFFTData(){
+	return !_fftData.empty() && !_fftData[0].empty();
 }

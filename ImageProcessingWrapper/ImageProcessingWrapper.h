@@ -10,6 +10,7 @@ namespace ImageProcessingWrapper {
     private:
         NativeEngine::ImageProcessingEngine* _nativeEngine;
 
+
     public:
         ImageEngine() {
             _nativeEngine = new NativeEngine::ImageProcessingEngine();
@@ -27,8 +28,8 @@ namespace ImageProcessingWrapper {
         void ApplySobel(array<System::Byte>^ pixels, int width, int height);
         void ApplyLaplacian(array<System::Byte>^ pixels, int width, int height);
         void ApplyTemplateMatch(array<System::Byte>^ originalPixels, int width, int height, array<System::Byte>^ templatePixels, int templateWidth, int templateHeight, int% matchX, int% matchY);
-        void ApplyFFT(array<System::Byte>^ pixels, int width, int height);
-        void ApplyIFFT(array<System::Byte>^ pixels, int width, int height);
+        bool ApplyFFT(array<System::Byte>^ pixels, int width, int height);
+        bool ApplyIFFT(array<System::Byte>^ pixels, int width, int height);
         void ClearFFTData();
         bool HasFFTData();
     };
