@@ -848,7 +848,7 @@ namespace ImageProcessing.ViewModel
             }
 
             ApplyFilter(() => _imageProcessor.ApplyIFFT(CurrentBitmapImage), "IFFT");
-            _imageProcessor.ClearFFTData();
+            //_imageProcessor.ClearFFTData();
         }
 
         private void ExecuteUndo()

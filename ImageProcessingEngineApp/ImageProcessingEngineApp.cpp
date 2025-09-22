@@ -503,59 +503,64 @@ int nextPowerOf2(int n) {
 
 bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int width, int height) {
 	const int channels = 4; // BGRA
-	_fftData.assign(height, vector<complex<double>>(width));
 
-	// 1. BGRA → Grayscale 변환
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
-			int idx = (j * width + i) * channels;
-			unsigned char b = pixels[idx + 0];
-			unsigned char g = pixels[idx + 1];
-			unsigned char r = pixels[idx + 2];
-			double gray = 0.114 * b + 0.587 * g + 0.299 * r;
-			_fftData[j][i] = complex<double>(gray, 0.0);
+	// 1. FFT를 위해 이미지 크기를 2의 거듭제곱으로 패딩
+	int padWidth = nextPowerOf2(width);
+	int padHeight = nextPowerOf2(height);
+
+	_fftData.assign(padHeight, vector<complex<double>>(padWidth));
+
+	// 2. 그레이스케일로 변환하고 패딩된 데이터 구조에 복사 (빈 공간은 0으로 채움)
+	for (int j = 0; j < padHeight; j++) {
+		for (int i = 0; i < padWidth; i++) {
+			if (j < height && i < width) {
+				int idx = (j * width + i) * channels;
+				double gray = 0.114 * pixels[idx + 0] + 0.587 * pixels[idx + 1] + 0.299 * pixels[idx + 2];
+				_fftData[j][i] = complex<double>(gray, 0.0);
+			}
+			else {
+				_fftData[j][i] = complex<double>(0.0, 0.0); // Zero-padding
+			}
 		}
 	}
 
-	// 2. 행별 FFT
-	for (int j = 0; j < height; j++)
-		fft1d(_fftData[j], false);
-
-	// 3. 열별 FFT
-	for (int i = 0; i < width; i++) {
-		vector<complex<double>> col(height);
-		for (int j = 0; j < height; j++)
-			col[j] = _fftData[j][i];
+	// 3. 2D FFT 수행 (행 -> 열 순서)
+	for (int j = 0; j < padHeight; j++) fft1d(_fftData[j], false);
+	for (int i = 0; i < padWidth; i++) {
+		vector<complex<double>> col(padHeight);
+		for (int j = 0; j < padHeight; j++) col[j] = _fftData[j][i];
 		fft1d(col, false);
-		for (int j = 0; j < height; j++)
-			_fftData[j][i] = col[j];
+		for (int j = 0; j < padHeight; j++) _fftData[j][i] = col[j];
 	}
-	_fftDataBackup = _fftData;
 
-	// 4. FFT Shift (스펙트럼 중앙 정렬)
+	_fftDataBackup = _fftData; // 역변환을 위해 un-shifted 데이터 백업
+
+	// 4. 스펙트럼 시각화를 위해 중앙으로 이동 (FFT Shift)
 	fftShift();
 
-	// 5. 로그 스케일링
+	// 5. 로그 스케일링으로 명암 대비 조절
 	double max_val = 0.0;
-	vector<vector<double>> mag(height, vector<double>(width));
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
+	vector<vector<double>> mag(padHeight, vector<double>(padWidth));
+	for (int j = 0; j < padHeight; j++) {
+		for (int i = 0; i < padWidth; i++) {
 			double val = log(1.0 + abs(_fftData[j][i]));
 			mag[j][i] = val;
 			if (val > max_val) max_val = val;
 		}
 	}
 
-	// 6. 0~255 정규화해서 BGRA 출력
+	// 6. 0-255로 정규화하여 원본 크기의 버퍼에 결과 저장
 	if (max_val == 0) max_val = 1.0;
+	int startX = (padWidth - width) / 2;
+	int startY = (padHeight - height) / 2;
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
-			unsigned char v = static_cast<unsigned char>((mag[j][i] / max_val) * 255.0);
+			unsigned char v = static_cast<unsigned char>((mag[j + startY][i + startX] / max_val) * 255.0);
 			int idx = (j * width + i) * channels;
-			pixels[idx + 0] = v; // B
-			pixels[idx + 1] = v; // G
-			pixels[idx + 2] = v; // R
-			// Alpha는 그대로 둠
+			pixels[idx + 0] = v; // Blue
+			pixels[idx + 1] = v; // Green
+			pixels[idx + 2] = v; // Red
+			pixels[idx + 3] = 255; // Alpha (불투명)
 		}
 	}
 
@@ -566,11 +571,10 @@ bool NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int w
 	if (_fftDataBackup.empty()) return false;
 
 	const int channels = 4;
-	// 패딩된 데이터의 크기를 가져옴
 	const int padHeight = _fftDataBackup.size();
 	const int padWidth = _fftDataBackup[0].size();
 
-	// 1. 백업해 둔 Shift 되기 전의 순수 FFT 데이터를 사용
+	// 1. 백업해 둔 un-shifted FFT 데이터를 복원
 	_fftData = _fftDataBackup;
 
 	// 2. 2D IFFT 수행 (행 -> 열 순서)
@@ -582,28 +586,26 @@ bool NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int w
 		for (int y = 0; y < padHeight; y++) _fftData[y][x] = col[y];
 	}
 
-	// 3. 복원된 데이터를 원본 이미지 크기(width, height)에 맞게 잘라서 저장
+	// 3. 복원된 데이터를 원본 이미지 크기에 맞게 잘라서 저장
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			// 실수부만 가져와서 픽셀 값으로 사용
 			double val = _fftData[y][x].real();
 			unsigned char gray = static_cast<unsigned char>(std::clamp(round(val), 0.0, 255.0));
 
 			int idx = (y * width + x) * channels;
-			pixels[idx + 0] = gray; // B
-			pixels[idx + 1] = gray; // G
-			pixels[idx + 2] = gray; // R
+			pixels[idx + 0] = gray; // Blue
+			pixels[idx + 1] = gray; // Green
+			pixels[idx + 2] = gray; // Red
+			pixels[idx + 3] = 255;  // Alpha (불투명)
 		}
 	}
 
-	// 사용이 끝난 백업 데이터는 초기화
+	// 4. 사용이 끝난 데이터 초기화
 	_fftDataBackup.clear();
 	_fftData.clear();
 
 	return true;
 }
-
-
 
 void NativeEngine::ImageProcessingEngine::ClearFFTData() {
 	_fftDataBackup.clear();
