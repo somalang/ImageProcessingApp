@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "ImageProcessingEngineApp.h" // NativeEngine 클래스 포함
+#include "ImageProcessingEngineApp.h"
 
 using namespace System;
 

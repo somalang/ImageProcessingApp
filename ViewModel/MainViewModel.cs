@@ -94,7 +94,7 @@ namespace ImageProcessing.ViewModel
             {
                 if (SetProperty(ref loadedImage, value))
                 {
-                    UpdatePreviewImage(); // 추가
+                    UpdatePreviewImage();
                 }
             }
         }
@@ -140,7 +140,7 @@ namespace ImageProcessing.ViewModel
             {
                 if (SetProperty(ref imageControlSize, value))
                 {
-                    // 이미지가 로드되어 있다면 baseScale 재계산
+                    // 이미지 이미 로드시 baseScale 재계산
                     if (CurrentBitmapImage != null)
                         InitializeBaseScale(imageControlSize, CurrentBitmapImage);
                 }
@@ -194,7 +194,7 @@ namespace ImageProcessing.ViewModel
             {
                 _previewImage = value;
                 OnPropertyChanged(nameof(PreviewImage)); // UI에 변경사항 알림
-                OnPropertyChanged(nameof(PreviewVisibility)); // 프리뷰 창의 보임/숨김 상태도 갱신
+                OnPropertyChanged(nameof(PreviewVisibility)); // 프리뷰 창 상태 갱신
             }
         }
         public Visibility PreviewVisibility
@@ -665,13 +665,12 @@ namespace ImageProcessing.ViewModel
             if (croppedImage != null)
             {
                 clipboardService.SetImage(croppedImage);
-                // 수정된 메서드 호출
                 CurrentBitmapImage = _imageProcessor.ClearSelection(CurrentBitmapImage, imageSelectionRect);
                 LoadedImage = CurrentBitmapImage;
                 ResetSelection();
                 logService.AddLog("Cut Selection", 0);
 
-                // UI 갱신을 위해 필수!
+                // UI 갱신
                 OnPropertyChanged(nameof(CanUndo));
                 OnPropertyChanged(nameof(CanRedo));
             }
@@ -758,7 +757,7 @@ namespace ImageProcessing.ViewModel
             double imageWidth = imageSource.PixelWidth;
             double imageHeight = imageSource.PixelHeight;
 
-            // baseScale 기반으로 effective scale 계산 (원본 크기에 맞춰 fit 한 뒤 Zoom 적용)
+            // baseScale 기반 effective scale 계산 (원본 크기에 맞춰 fit 한 뒤 Zoom 적용)
             double effectiveScale = baseScale;
 
             double xOffset = (controlSize.Width - imageWidth * effectiveScale) / 2;
@@ -831,7 +830,7 @@ namespace ImageProcessing.ViewModel
             }
             catch (Exception ex)
             {
-                stopwatch.Stop(); // 오류 발생 시에도 시간 측정 중지
+                stopwatch.Stop(); // 오류 발생 시 시간 측정 중지
                 MessageBox.Show($"[{operationName}] 처리 중 오류: {ex.Message}",
                                 "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -848,7 +847,6 @@ namespace ImageProcessing.ViewModel
             }
 
             ApplyFilter(() => _imageProcessor.ApplyIFFT(CurrentBitmapImage), "IFFT");
-            //_imageProcessor.ClearFFTData();
         }
 
         private void ExecuteUndo()
@@ -878,12 +876,12 @@ namespace ImageProcessing.ViewModel
 
             try
             {
-                // ApplyFFT가 새로운 BitmapImage를 반환하므로 이를 받아서 CurrentBitmapImage에 할당
+                // ApplyFFT가 새로운 BitmapImage 반환 -> 이거 받아서 CurrentBitmapImage에 할당
                 var fftResult = _imageProcessor.ApplyFFT(CurrentBitmapImage);
 
                 stopwatch.Stop();
 
-                // FFT 결과가 성공적으로 생성되었는지 확인
+                // FFT 결과 생성 확인
                 if (fftResult != null && _imageProcessor.HasFFTData())
                 {
                     // 새로운 FFT 결과 이미지로 업데이트
@@ -1004,7 +1002,7 @@ namespace ImageProcessing.ViewModel
         }
         private void ShowSettingsWindow()
         {
-            // settingsWindow를 생성할 때 settingService를 인자로 전달합니다.
+            // settingsWindow 생성시 settingService를 인자로 전달
             var settingsWindow = new SettingsWindow(settingService)
             {
                 Owner = Application.Current.MainWindow
@@ -1012,10 +1010,10 @@ namespace ImageProcessing.ViewModel
 
             if (settingsWindow.ShowDialog() == true)
             {
-                // 설정이 저장된 후 다시 로드
+                // 설정 저장 후 로드
                 LoadApplicationSettings();
 
-                // 설정 변경 알림 (필요시)
+                // 설정 변경 알림
                 ProcessingTime = "설정이 업데이트되었습니다.";
             }
         }
@@ -1029,11 +1027,11 @@ namespace ImageProcessing.ViewModel
         {
             if (CurrentBitmapImage == null) return;
 
-            // 1. 분석 서비스 생성 및 보고서 생성
+            // 분석 서비스 생성 및 보고서 생성
             var analysisService = new AnalysisService();
             var report = analysisService.GenerateReport(CurrentBitmapImage, logService.GetLogs());
 
-            // 2. 보고서 창 표시
+            // 보고서 창 표시
             var reportWindow = new AnalysisReportWindow(report)
             {
                 Owner = Application.Current.MainWindow

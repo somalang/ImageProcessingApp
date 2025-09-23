@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq; // .Any()를 사용하기 위해 추가
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -13,7 +13,6 @@ namespace ImageProcessing.Services
     public class ImageProcessor
     {
         private readonly ImageEngine _engine = new ImageEngine();
-        // 스택의 타입을 BitmapImage로 유지합니다.
         private readonly Stack<BitmapImage> _undoStack = new Stack<BitmapImage>();
         private readonly Stack<BitmapImage> _redoStack = new Stack<BitmapImage>();
 
@@ -25,7 +24,7 @@ namespace ImageProcessing.Services
         {
             if (image != null)
             {
-                _undoStack.Push(CloneBitmapImage(image)); // 복제본 저장
+                _undoStack.Push(CloneBitmapImage(image)); // 복사본 저장하기
                 _redoStack.Clear();
             }
         }
@@ -117,7 +116,7 @@ namespace ImageProcessing.Services
                 ref matchX, ref matchY
             );
 
-            if (matchX >= 0 && matchY >= 0) // 적절한 성공 조건으로 수정
+            if (matchX >= 0 && matchY >= 0)
             {
                 return new Rect(matchX, matchY, templateImage.PixelWidth, templateImage.PixelHeight);
             }
@@ -145,14 +144,35 @@ namespace ImageProcessing.Services
             });
         }
 
-        public BitmapImage ApplyGrayscale(BitmapImage source) => ApplyFilter(source, (p, w, h) => _engine.ApplyGrayscale(p, w, h));
-        public BitmapImage ApplyGaussianBlur(BitmapImage source, float sigma) => ApplyFilter(source, (p, w, h) => _engine.ApplyGaussianBlur(p, w, h, sigma));
-        public BitmapImage ApplySobel(BitmapImage source) => ApplyFilter(source, (p, w, h) => _engine.ApplySobel(p, w, h));
-        public BitmapImage ApplyLaplacian(BitmapImage source, int kernelType) => ApplyFilter(source, (p, w, h) => _engine.ApplyLaplacian(p, w, h));
-        public BitmapImage ApplyBinarization(BitmapImage source, int param = 128) => ApplyFilter(source, (p, w, h) => _engine.ApplyBinarization(p, w, h));
-        public BitmapImage ApplyDilation(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyDilation(p, w, h));
-        public BitmapImage ApplyErosion(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyErosion(p, w, h));
-        public BitmapImage ApplyMedian(BitmapImage source, int param = 3) => ApplyFilter(source, (p, w, h) => _engine.ApplyMedian(p, w, h, param));
+        public BitmapImage ApplyGrayscale(BitmapImage source) {
+           return ApplyFilter(source, (p, w, h) => _engine.ApplyGrayscale(p, w, h));
+        }
+        public BitmapImage ApplyGaussianBlur(BitmapImage source, float sigma) { 
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyGaussianBlur(p, w, h, sigma));
+        }
+        public BitmapImage ApplySobel(BitmapImage source) { 
+            return ApplyFilter(source, (p, w, h) => _engine.ApplySobel(p, w, h));
+        }
+        public BitmapImage ApplyLaplacian(BitmapImage source, int kernelType)
+        {
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyLaplacian(p, w, h));
+        }
+        public BitmapImage ApplyBinarization(BitmapImage source, int param = 128)
+        {
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyBinarization(p, w, h));
+        }
+        public BitmapImage ApplyDilation(BitmapImage source, int param = 3)
+        {
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyDilation(p, w, h));
+        }
+        public BitmapImage ApplyErosion(BitmapImage source, int param = 3)
+        {
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyErosion(p, w, h));
+        }
+        public BitmapImage ApplyMedian(BitmapImage source, int param = 3)
+        {
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyMedian(p, w, h, param));
+        }
 
         public BitmapImage ApplyFFT(BitmapImage source)
         {

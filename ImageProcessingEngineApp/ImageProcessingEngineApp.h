@@ -7,6 +7,7 @@
 #include <complex>
 #include <algorithm>
 #include <cstring>
+#include <omp.h>
 
 #ifdef IMAGEPROCESSINGENGINEAPP_EXPORTS
 #define ENGINE_API __declspec(dllexport)
