@@ -1,14 +1,14 @@
-ï»¿#include <fstream>
+#include <fstream>
 #include "ImageProcessingEngineApp.h"
 
 using namespace std;
 
 void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, int width, int height) {
-	// ì‚¬ì§„ì˜ í¬ê¸°ë¥¼ í™•ì¸í•œë‹¤ -> ë§¤ê°œë³€ìˆ˜ë¡œ ë°›ìŒ
-	// ëª¨ë“  í”½ì…€ì˜ RGB ê°’ì„ êµ¬í•œë‹¤
+	// »çÁøÀÇ Å©±â¸¦ È®ÀÎÇÑ´Ù -> ¸Å°³º¯¼ö·Î ¹ŞÀ½
+	// ¸ğµç ÇÈ¼¿ÀÇ RGB °ªÀ» ±¸ÇÑ´Ù
 	unsigned int avg = 0;
 	unsigned int red, blue, green;
-#pragma omp parallel for
+#pragma omp parallel for private(red, green, blue, avg)
 	for (int i = 0; i < width * height; i++) {
 		red = pixels[i * 4 + 0];
 		green = pixels[i * 4 + 1];
@@ -20,14 +20,14 @@ void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, 
 	}
 }
 
-//ëª…ë„ëŠ” ìœ ì§€í•œë‹¤ (alpha)
+//¸íµµ´Â À¯ÁöÇÑ´Ù (alpha)
 
 void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixels, int width, int height, float sigma) {
-	const int channels = 4; // BGRA í¬ë§·ì´ë¯€ë¡œ 4ì±„ë„
+	const int channels = 4; // BGRA Æ÷¸ËÀÌ¹Ç·Î 4Ã¤³Î
 	const int stride = width * channels;
 	const int dataSize = stride * height;
 
-	// ê°€ìš°ì‹œì•ˆ ì»¤ë„ ê³„ì‚°
+	// °¡¿ì½Ã¾È Ä¿³Î °è»ê
 	int kernelRadius = static_cast<int>(ceil(sigma * 3));
 	int kernelSize = kernelRadius * 2 + 1;
 	std::vector<double> kernel(kernelSize);
@@ -37,14 +37,14 @@ void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixel
 		kernel[i] = exp(-0.5 * pow((i - kernelRadius) / sigma, 2.0));
 		sum += kernel[i];
 	}
-	// ì •ê·œí™”
+	// Á¤±ÔÈ­
 	for (int i = 0; i < kernelSize; i++) {
 		kernel[i] /= sum;
 	}
 
 	std::vector<unsigned char> temp(dataSize);
 
-	//ê°€ë¡œ ë¸”ëŸ¬ ì ìš©
+	//°¡·Î ºí·¯ Àû¿ë
 #pragma omp parallel for (static) private(b, g, r)
 	for (int y = 0; y < height; ++y) {
 		for (int x = 0; x < width; ++x) {
@@ -61,11 +61,11 @@ void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixel
 			temp[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
 			temp[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
 			temp[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
-			temp[out_idx + 3] = pixels[out_idx + 3]; // ì•ŒíŒŒ ì±„ë„ì€ ê·¸ëŒ€ë¡œ ìœ ì§€
+			temp[out_idx + 3] = pixels[out_idx + 3]; // ¾ËÆÄ Ã¤³ÎÀº ±×´ë·Î À¯Áö
 		}
 	}
 
-	// ì„¸ë¡œ ë¸”ëŸ¬ ì ìš©
+	// ¼¼·Î ºí·¯ Àû¿ë
 #pragma omp parallel for (static) private(b, g, r)
 	for (int y = 0; y < height; ++y) {
 		for (int x = 0; x < width; ++x) {
@@ -82,65 +82,63 @@ void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixel
 			pixels[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
 			pixels[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
 			pixels[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
-			// ì•ŒíŒŒ ì±„ë„ ì²˜ë¦¬ í•„ìš” ì—†ìŒ (ëª…ë„ë¼ì„œ)
+			// ¾ËÆÄ Ã¤³Î Ã³¸® ÇÊ¿ä ¾øÀ½ (¸íµµ¶ó¼­)
 		}
 	}
 }
 
 void NativeEngine::ImageProcessingEngine::ApplyMedian(unsigned char* pixels, int width, int height, int kernelSize) {
-	const int channels = 4; // BGRA í¬ë§·
+	const int channels = 4; // BGRA Æ÷¸Ë
 	const int stride = width * channels;
 	const int dataSize = stride * height;
 
-	// ìµœì¢… ê²°ê³¼ ì €ì¥ ë²„í¼ - 4ì±„ë„
+	// ÃÖÁ¾ °á°ú ÀúÀå ¹öÆÛ - 4Ã¤³Î
 	std::vector<unsigned char> result(dataSize);
 
 	int kernelHalf = kernelSize / 2;
 
-	// ìˆœíšŒ
-#pragma omp parallel for (static) private(b, g, r)
-
+	// ¼øÈ¸
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			// ì´ì›ƒê°’ ì €ì¥
+			// ÀÌ¿ô°ª ÀúÀå
 			std::vector<unsigned char> neighborhood_b;
 			std::vector<unsigned char> neighborhood_g;
 			std::vector<unsigned char> neighborhood_r;
 
-			// ì»¤ë„
+			// Ä¿³Î
 			for (int ky = -kernelHalf; ky <= kernelHalf; ky++) {
 				for (int kx = -kernelHalf; kx <= kernelHalf; kx++) {
-					// ê²½ê³„ ì²˜ë¦¬
+					// °æ°è Ã³¸®
 					int nx = std::clamp(x + kx, 0, width - 1);
 					int ny = std::clamp(y + ky, 0, height - 1);
 
-					// 4ì±„ë„ì„ ê³ ë ¤í•œ ì¸ë±ìŠ¤ ê³„ì‚°
+					// 4Ã¤³ÎÀ» °í·ÁÇÑ ÀÎµ¦½º °è»ê
 					int neighbor_idx = ny * stride + nx * channels;
 
-					// ê° ì±„ë„ì˜ ê°’ì„ í•´ë‹¹ ë²¡í„°ì— ì¶”ê°€
+					// °¢ Ã¤³ÎÀÇ °ªÀ» ÇØ´ç º¤ÅÍ¿¡ Ãß°¡
 					neighborhood_b.push_back(pixels[neighbor_idx + 0]);
 					neighborhood_g.push_back(pixels[neighbor_idx + 1]);
 					neighborhood_r.push_back(pixels[neighbor_idx + 2]);
 				}
 			}
 
-			// ì±„ë„ ì •ë ¬ - ì¤‘ì•™ê°’ ì°¾ê¸°
+			// Ã¤³Î Á¤·Ä - Áß¾Ó°ª Ã£±â
 			std::sort(neighborhood_b.begin(), neighborhood_b.end());
 			std::sort(neighborhood_g.begin(), neighborhood_g.end());
 			std::sort(neighborhood_r.begin(), neighborhood_r.end());
 
 			int current_idx = y * stride + x * channels;
 
-			// ì¤‘ì•™ê°’ìœ¼ë¡œ ë²„í¼ ì±„ìš°ê¸°
+			// Áß¾Ó°ªÀ¸·Î ¹öÆÛ Ã¤¿ì±â
 			size_t median_index = neighborhood_b.size() / 2;
 			result[current_idx + 0] = neighborhood_b[median_index]; // B
 			result[current_idx + 1] = neighborhood_g[median_index]; // G
 			result[current_idx + 2] = neighborhood_r[median_index]; // R
-			result[current_idx + 3] = pixels[current_idx + 3]; // AlphaëŠ” ì›ë³¸ ê·¸ëŒ€ë¡œ
+			result[current_idx + 3] = pixels[current_idx + 3]; // Alpha´Â ¿øº» ±×´ë·Î
 		}
 	}
 
-	// ê²°ê³¼ ë³µì‚¬
+	// °á°ú º¹»ç
 	memcpy(pixels, result.data(), dataSize);
 }
 
@@ -152,7 +150,8 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 	std::vector<unsigned char> gray(pixelCount);
 	std::vector<int> histogram(256, 0);
 
-	// RGB â†’ Grayscale ë³€í™˜
+	// RGB ¡æ Grayscale º¯È¯
+#pragma omp parallel for
 	for (int i = 0; i < pixelCount; ++i) {
 		gray[i] = static_cast<unsigned char>(
 			0.114 * pixels[i * channels + 0] +  // Blue
@@ -161,18 +160,19 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 			);
 	}
 
-	// íˆìŠ¤í† ê·¸ë¨
+	// È÷½ºÅä±×·¥
+#pragma omp parallel for reduction(+:histogram[:256])
 	for (int i = 0; i < pixelCount; i++) {
 		histogram[gray[i]]++;
 	}
 
-	// ì „ì²´ í”½ì…€ ë°ê¸° í•©
+	// ÀüÃ¼ ÇÈ¼¿ ¹à±â ÇÕ
 	float totalSum = 0.0f;
 	for (int i = 0; i < 256; i++) {
 		totalSum += i * histogram[i];
 	}
 
-	// ì˜¤ì¸ ì•Œê³ ë¦¬ì¦˜ ê³„ì‚°
+	// ¿ÀÃ÷¾Ë°í¸®Áò °è»ê
 	float sumForeground = 0.0f;
 	int weightForeground = 0;
 	int weightBackground = 0;
@@ -192,7 +192,7 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 		float meanForeground = sumForeground / weightForeground;
 		float meanBackground = (totalSum - sumForeground) / weightBackground;
 
-		// í´ë˜ìŠ¤ ê°„ ë¶„ì‚°
+		// Å¬·¡½º °£ ºĞ»ê
 		float varianceBetween = static_cast<float>(weightForeground) *
 			static_cast<float>(weightBackground) *
 			(meanForeground - meanBackground) *
@@ -204,7 +204,8 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 		}
 	}
 
-	//ìµœì  ì„ê³„ê°’ìœ¼ë¡œ ì´ì§„í™” ì²˜ë¦¬
+	//ÃÖÀû ÀÓ°è°ªÀ¸·Î ÀÌÁøÈ­ Ã³¸®
+#pragma omp parallel for
 	for (int i = 0; i < pixelCount; ++i) {
 		unsigned char value = (gray[i] > optimalThreshold) ? 255 : 0;
 		pixels[i * channels + 0] = value;
@@ -218,27 +219,27 @@ void NativeEngine::ImageProcessingEngine::ApplyDilation(unsigned char* pixels, i
 	const int stride = width * channels;
 	const int dataSize = stride * height;
 	std::vector<unsigned char> temp(dataSize);
-	memcpy(temp.data(), pixels, dataSize); // ì›ë³¸ ì´ë¯¸ì§€ë¥¼ tempì— ë³µì‚¬
+	memcpy(temp.data(), pixels, dataSize); // ¿øº» ÀÌ¹ÌÁö¸¦ temp¿¡ º¹»ç
 
-	// ê°€ì¥ìë¦¬ë¥¼ ì œì™¸í•œ í”½ì…€ ìˆœíšŒ
+	// °¡ÀåÀÚ¸®¸¦ Á¦¿ÜÇÑ ÇÈ¼¿ ¼øÈ¸
 #pragma omp parallel for
 	for (int y = 1; y < height - 1; y++) {
 		for (int x = 1; x < width - 1; x++) {
 			int current = y * stride + x * channels;
 			unsigned char max = 0;
 
-			// 3x3 ì»¤ë„ ìˆœíšŒ
+			// 3x3 Ä¿³Î ¼øÈ¸
 			for (int ky = -1; ky <= 1; ky++) {
 				for (int kx = -1; kx <= 1; kx++) {
 					int neighborIdx = (y + ky) * stride + (x + kx) * channels;
-					// B ì±„ë„ ê¸°ì¤€ ê°€ì¥ ë°ì€ ê°’
+					// B Ã¤³Î ±âÁØ °¡Àå ¹àÀº °ª
 					if (temp[neighborIdx] > max) {
 						max = temp[neighborIdx];
 					}
 				}
 			}
 
-			//ìµœëŒ€ê°’ ì„¤ì •
+			//ÃÖ´ë°ª ¼³Á¤
 			pixels[current + 0] = max;
 			pixels[current + 1] = max;
 			pixels[current + 2] = max;
@@ -253,26 +254,25 @@ void NativeEngine::ImageProcessingEngine::ApplyErosion(unsigned char* pixels, in
 	std::vector<unsigned char> temp(dataSize);
 	memcpy(temp.data(), pixels, dataSize);
 
-	// ê°€ì¥ìë¦¬ ì œì™¸ í”½ì…€ ìˆœíšŒ
+	// °¡ÀåÀÚ¸® Á¦¿Ü ÇÈ¼¿ ¼øÈ¸
 #pragma omp parallel for
-
 	for (int y = 1; y < height - 1; y++) {
 		for (int x = 1; x < width - 1; x++) {
 			int current_idx = y * stride + x * channels;
 			unsigned char min = 255;
 
-			// 3x3 ì»¤ë„ ìˆœíšŒ
+			// 3x3 Ä¿³Î ¼øÈ¸
 			for (int ky = -1; ky <= 1; ky++) {
 				for (int kx = -1; kx <= 1; kx++) {
 					int neighbor_idx = (y + ky) * stride + (x + kx) * channels;
-					// B ê¸°ì¤€ ì œì¼ ì–´ë‘ìš´ê°’
+					// B ±âÁØ Á¦ÀÏ ¾îµÎ¿î°ª
 					if (temp[neighbor_idx] < min) {
 						min = temp[neighbor_idx];
 					}
 				}
 			}
 
-			// ìµœì†Œê°’ ì„¤ì •
+			// ÃÖ¼Ò°ª ¼³Á¤
 			pixels[current_idx + 0] = min;
 			pixels[current_idx + 1] = min;
 			pixels[current_idx + 2] = min;
@@ -285,9 +285,8 @@ void NativeEngine::ImageProcessingEngine::ApplySobel(unsigned char* pixels, int 
 	const int stride = width * channels;
 	const int pixelNum = width * height;
 
-	// ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ì ìš©í•´ì„œ ì„ì‹œë²„í¼ ë„£ê¸°
+	// ±×·¹ÀÌ½ºÄÉÀÏ Àû¿ëÇØ¼­ ÀÓ½Ã¹öÆÛ ³Ö±â
 	std::vector<unsigned char> gray_pixels(pixelNum);
-
 #pragma omp parallel for
 	for (int i = 0; i < pixelNum; ++i) {
 		gray_pixels[i] = static_cast<unsigned char>(
@@ -297,17 +296,16 @@ void NativeEngine::ImageProcessingEngine::ApplySobel(unsigned char* pixels, int 
 			);
 	}
 
-	// ê·¸ë˜ë””ì–¸íŠ¸ì™€ ìµœì¢… ê²°ê³¼ë¥¼ ì €ì¥í•  ë²„í¼
+	// ±×·¡µğ¾ğÆ®¿Í ÃÖÁ¾ °á°ú¸¦ ÀúÀåÇÒ ¹öÆÛ
 	std::vector<unsigned char> result(pixelNum, 0);
 	std::vector<double> gradientX(pixelNum, 0);
 	std::vector<double> gradientY(pixelNum, 0);
 
-	// ì†Œë²¨ ì»¤ë„
+	// ¼Òº§ Ä¿³Î
 	int kernelX[3][3] = { {-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1} };
 	int kernelY[3][3] = { {1, 2, 1}, {0, 0, 0}, {-1, -2, -1} };
 
-	// ì»¨ë³¼ë£¨ì…˜ ì—°ì‚°
-#pragma omp parallel for
+	// ÄÁº¼·ç¼Ç ¿¬»ê
 	for (int y = 1; y < height - 1; y++) {
 		for (int x = 1; x < width - 1; x++) {
 			double sumX = 0;
@@ -324,17 +322,19 @@ void NativeEngine::ImageProcessingEngine::ApplySobel(unsigned char* pixels, int 
 		}
 	}
 
-	// ìµœì¢… ê·¸ë˜ë””ì–¸íŠ¸ ì ìš© ì´ë¯¸ì§€
+	// ÃÖÁ¾ ±×·¡µğ¾ğÆ® Àû¿ë ÀÌ¹ÌÁö
+#pragma omp parallel for
 	for (int i = 0; i < pixelNum; i++) {
 		double magnitude = sqrt(pow(gradientX[i], 2) + pow(gradientY[i], 2));
 		result[i] = static_cast<unsigned char>(std::clamp(magnitude, 0.0, 255.0));
 	}
 
-	// ì›ë³¸ì— ë³µì‚¬
+	// ¿øº»¿¡ º¹»ç
+#pragma omp parallel for
 	for (int i = 0; i < pixelNum; ++i) {
-		pixels[i * channels + 0] = result[i]; 
+		pixels[i * channels + 0] = result[i];
 		pixels[i * channels + 1] = result[i];
-		pixels[i * channels + 2] = result[i]; 
+		pixels[i * channels + 2] = result[i];
 	}
 }
 
@@ -343,8 +343,10 @@ void NativeEngine::ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, 
 	const int stride = width * channels;
 	const int pixelNum = width * height;
 
-	// ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ë³€í™˜
+	// ±×·¹ÀÌ½ºÄÉÀÏ º¯È¯
 	std::vector<unsigned char> temp(pixelNum);
+
+#pragma omp parallel for
 	for (int i = 0; i < pixelNum; ++i) {
 		temp[i] = static_cast<unsigned char>(
 			0.114 * pixels[i * channels + 0] + // Blue
@@ -353,10 +355,10 @@ void NativeEngine::ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, 
 			);
 	}
 
-	// ë¼í”Œë¼ìŠ¤ ì—°ì‚° ê²°ê³¼ ì €ì¥
+	// ¶óÇÃ¶ó½º ¿¬»ê °á°ú ÀúÀå
 	std::vector<int> laplacianResult(pixelNum, 0);
 
-	// 8ë°©í–¥ ì‚¬ìš©
+	// 8¹æÇâ »ç¿ë
 #pragma omp parallel for
 	for (int y = 1; y < height - 1; y++) {
 		for (int x = 1; x < width - 1; x++) {
@@ -372,33 +374,34 @@ void NativeEngine::ImageProcessingEngine::ApplyLaplacian(unsigned char* pixels, 
 			int down = temp[(y + 1) * width + x];
 			int downRight = temp[(y + 1) * width + (x + 1)];
 
-			// 8ê°œ í”½ì…€ í•© - 8 * ì¤‘ì•™ê°’
+			// 8°³ ÇÈ¼¿ ÇÕ - 8 * Áß¾Ó°ª
 			int laplacianValue = (upLeft + up + upRight + left + right + downLeft + down + downRight) - 8 * current;
 
-			// ì ˆëŒ“ê°’ -> ì—£ì§€ ì‹œê°í™”
+			// Àı´ñ°ª -> ¿§Áö ½Ã°¢È­
 			laplacianResult[current_idx] = abs(laplacianValue);
 		}
 	}
 
-	// ì •ê·œí™”
+	// Á¤±ÔÈ­
 	int max = 0;
 	for (int val : laplacianResult) {
 		if (val > max) {
 			max = val;
 		}
 	}
-	// 0 ë‚˜ëˆ„ê¸° ë°©ì§€
+	// 0 ³ª´©±â ¹æÁö
 	if (max == 0) {
 		max = 1;
 	}
 
-	// ì •ê·œí™” ê²°ê³¼ì €ì¥
+	// Á¤±ÔÈ­ °á°úÀúÀå
+#pragma omp parallel for
 	for (int i = 0; i < pixelNum; ++i) {
 		unsigned char result = static_cast<unsigned char>((laplacianResult[i] * 255) / max);
 		pixels[i * channels + 0] = result; // Blue
 		pixels[i * channels + 1] = result; // Green
 		pixels[i * channels + 2] = result; // Red
-		// Alpha ì±„ë„ì€ ê·¸ëŒ€ë¡œ ìœ ì§€
+		// Alpha Ã¤³ÎÀº ±×´ë·Î À¯Áö
 	}
 }
 
@@ -409,34 +412,38 @@ void NativeEngine::ImageProcessingEngine::ApplyTemplateMatch(
 {
 	const int channels = 4;
 
-	// ì›ë³¸ ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ë³€í™˜
+	// ¿øº» ±×·¹ÀÌ½ºÄÉÀÏ º¯È¯
 	int originalPixelNum = originalWidth * originalHeight;
 	std::vector<unsigned char> originalGrayScaled(originalPixelNum);
+
+#pragma omp parallel for
 	for (int i = 0; i < originalPixelNum; ++i) {
 		originalGrayScaled[i] = static_cast<unsigned char>(
 			(originalPixels[i * channels] + originalPixels[i * channels + 1] + originalPixels[i * channels + 2]) / 3.0
 			);
 	}
 
-	// í…œí”Œë¦¿ë„ ë³€í™˜
+	// ÅÛÇÃ¸´µµ º¯È¯
 	int templatePixelNum = templateWidth * templateHeight;
 	std::vector<unsigned char> templateGrayScaled(templatePixelNum);
+#pragma omp parallel for
 	for (int i = 0; i < templatePixelNum; ++i) {
 		templateGrayScaled[i] = static_cast<unsigned char>(
 			(templatePixels[i * channels] + templatePixels[i * channels + 1] + templatePixels[i * channels + 2]) / 3.0
 			);
 	}
 
-	long long min = -1; // ì ˆëŒ€ì°¨ í•©ì˜ ìµœì†Ÿê°’ ì €ì¥
+	long long min = -1; // Àı´ëÂ÷ ÇÕÀÇ ÃÖ¼Ú°ª ÀúÀå
 	*matchX = -1;
 	*matchY = -1;
 
-	// í…œí”Œë¦¿ ë§¤ì¹­ ìˆ˜í–‰
+	// ÅÛÇÃ¸´ ¸ÅÄª ¼öÇà
+#pragma omp parallel for
 	for (int y = 0; y <= originalHeight - templateHeight; y++) {
 		for (int x = 0; x <= originalWidth - templateWidth; x++) {
 			long long currentSAD = 0;
 
-			// í…œí”Œë¦¿ ì˜ì—­ ìˆœíšŒ -> ì ˆëŒ€ì°¨ í•©ê³„ ê³„ì‚°
+			// ÅÛÇÃ¸´ ¿µ¿ª ¼øÈ¸ -> Àı´ëÂ÷ ÇÕ°è °è»ê
 			for (int ty = 0; ty < templateHeight; ty++) {
 				for (int tx = 0; tx < templateWidth; tx++) {
 					int originalIdx = (y + ty) * originalWidth + (x + tx);
@@ -446,7 +453,7 @@ void NativeEngine::ImageProcessingEngine::ApplyTemplateMatch(
 				}
 			}
 
-			// ì ˆëŒ€ì°¨ í•©ì´ ê°€ì¥ ì‘ì€ ìœ„ì¹˜ ê³„ì‚°
+			// Àı´ëÂ÷ ÇÕÀÌ °¡Àå ÀÛÀº À§Ä¡ °è»ê
 			if (min == -1 || currentSAD < min) {
 				min = currentSAD;
 				*matchX = x;
@@ -460,7 +467,8 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 	int num = data.size();
 	if (num <= 1) return;
 
-	// ë¹„íŠ¸ ë°˜ì „ ìˆœì„œë¡œ ë°ì´í„° ì¬ì •ë ¬
+	// ºñÆ® ¹İÀü ¼ø¼­·Î µ¥ÀÌÅÍ ÀçÁ¤·Ä
+#pragma omp parallel for
 	for (int i = 1, j = 0; i < num; i++) {
 		int bit = num >> 1;
 		for (; j & bit; bit >>= 1)
@@ -470,7 +478,8 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 			swap(data[i], data[j]);
 	}
 
-	// ë²„í„°í”Œë¼ì´ ì—°ì‚°
+	// ¹öÅÍÇÃ¶óÀÌ ¿¬»ê
+#pragma omp parallel for
 	for (int len = 2; len <= num; len <<= 1) {
 		double ang = 2 * std::numbers::pi / len * (inverse ? -1 : 1);
 		complex<double> wlen(cos(ang), sin(ang));
@@ -486,7 +495,7 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 		}
 	}
 
-	// IFFTì¼ ê²½ìš° í¬ê¸° ë³´ì •
+	// IFFTÀÏ °æ¿ì Å©±â º¸Á¤
 	if (inverse) {
 		for (auto& val : data) {
 			val /= num;
@@ -494,13 +503,14 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 	}
 }
 
-//shift ê°€ ë¹ ì§!
+//shift °¡ ºüÁü!
 void NativeEngine::ImageProcessingEngine::fftShift() {
 	int height = _fftData.size();
 	int width = _fftData[0].size();
 	int cx = width / 2;
 	int cy = height / 2;
 
+#pragma omp parallel for
 	for (int y = 0; y < cy; y++) {
 		for (int x = 0; x < cx; x++) {
 			swap(_fftData[y][x], _fftData[y + cy][x + cx]);
@@ -509,7 +519,7 @@ void NativeEngine::ImageProcessingEngine::fftShift() {
 	}
 }
 
-//íŒ¨ë”©ì—°ì‚°ì€ ê·¸ëƒ¥ í•¨ìˆ˜ë¡œ ë¹¼ê¸°
+//ÆĞµù¿¬»êÀº ±×³É ÇÔ¼ö·Î »©±â
 int nextPowerOf2(int n) {
 	int p = 1;
 	while (p < n) p <<= 1;
@@ -519,13 +529,14 @@ int nextPowerOf2(int n) {
 bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int width, int height) {
 	const int channels = 4; // BGRA
 
-	// íŒ¨ë”©í•˜ê¸°
+	// ÆĞµùÇÏ±â
 	int padWidth = nextPowerOf2(width);
 	int padHeight = nextPowerOf2(height);
 
 	_fftData.assign(padHeight, vector<complex<double>>(padWidth));
 
-	//ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ë³€í™˜, ì œë¡œ íŒ¨ë”© ì ìš©
+	//±×·¹ÀÌ½ºÄÉÀÏ º¯È¯, Á¦·Î ÆĞµù Àû¿ë
+#pragma omp parallel for
 	for (int j = 0; j < padHeight; j++) {
 		for (int i = 0; i < padWidth; i++) {
 			if (j < height && i < width) {
@@ -540,6 +551,7 @@ bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int wi
 	}
 
 	//2D FFT 
+#pragma omp parallel for
 	for (int j = 0; j < padHeight; j++) fft1d(_fftData[j], false);
 	for (int i = 0; i < padWidth; i++) {
 		vector<complex<double>> col(padHeight);
@@ -548,14 +560,15 @@ bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int wi
 		for (int j = 0; j < padHeight; j++) _fftData[j][i] = col[j];
 	}
 
-	_fftDataBackup = _fftData; 
+	_fftDataBackup = _fftData;
 
-	// ì¤‘ì•™ìœ¼ë¡œ ì´ë™
+	// Áß¾ÓÀ¸·Î ÀÌµ¿
 	fftShift();
 
-	//ë¡œê·¸ ìŠ¤ì¼€ì¼ë§ -> ëª…ì•” ëŒ€ë¹„ ì¡°ì ˆí•´ì•¼ í•¨
+	//·Î±× ½ºÄÉÀÏ¸µ -> ¸í¾Ï ´ëºñ Á¶ÀıÇØ¾ß ÇÔ
 	double max_val = 0.0;
 	vector<vector<double>> mag(padHeight, vector<double>(padWidth));
+#pragma omp parallel for
 	for (int j = 0; j < padHeight; j++) {
 		for (int i = 0; i < padWidth; i++) {
 			double val = log(1.0 + abs(_fftData[j][i]));
@@ -564,10 +577,11 @@ bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int wi
 		}
 	}
 
-	//ì •ê·œí™”(0~255)í•´ì„œ ì €ì¥
+	//Á¤±ÔÈ­(0~255)ÇØ¼­ ÀúÀå
 	if (max_val == 0) max_val = 1.0;
 	int startX = (padWidth - width) / 2;
 	int startY = (padHeight - height) / 2;
+#pragma omp parallel for
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
 			unsigned char v = static_cast<unsigned char>((mag[j + startY][i + startX] / max_val) * 255.0);
@@ -575,7 +589,7 @@ bool NativeEngine::ImageProcessingEngine::ApplyFFT(unsigned char* pixels, int wi
 			pixels[idx + 0] = v; // Blue
 			pixels[idx + 1] = v; // Green
 			pixels[idx + 2] = v; // Red
-			pixels[idx + 3] = 255; // Alpha (ë¶ˆíˆ¬ëª…)
+			pixels[idx + 3] = 255; // Alpha (ºÒÅõ¸í)
 		}
 	}
 
@@ -589,10 +603,11 @@ bool NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int w
 	const int padHeight = _fftDataBackup.size();
 	const int padWidth = _fftDataBackup[0].size();
 
-	// ì €ì¥í•´ë‘” ë°ì´í„° ì‚¬ìš© (shift ì „)
+	// ÀúÀåÇØµĞ µ¥ÀÌÅÍ »ç¿ë (shift Àü)
 	_fftData = _fftDataBackup;
 
-	// 2D IFFT (ê°€ë¡œ -> ì„¸ë¡œ)
+	// 2D IFFT (°¡·Î -> ¼¼·Î)
+#pragma omp parallel for
 	for (int y = 0; y < padHeight; y++) fft1d(_fftData[y], true);
 	for (int x = 0; x < padWidth; x++) {
 		vector<complex<double>> col(padHeight);
@@ -601,22 +616,23 @@ bool NativeEngine::ImageProcessingEngine::ApplyIFFT(unsigned char* pixels, int w
 		for (int y = 0; y < padHeight; y++) _fftData[y][x] = col[y];
 	}
 
-	// ì›ë³¸ ì´ë¯¸ì§€ í¬ê¸°ì— ë§ê²Œ ë³µì› ì´ë¯¸ì§€ ì˜ë¼ì„œ ì €ì¥
+	// ¿øº» ÀÌ¹ÌÁö Å©±â¿¡ ¸Â°Ô º¹¿ø ÀÌ¹ÌÁö Àß¶ó¼­ ÀúÀå
+#pragma omp parallel for
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			double val = _fftData[y][x].real();
 			unsigned char gray = static_cast<unsigned char>(std::clamp(round(val), 0.0, 255.0));
 
-			//BGRA ì²˜ë¦¬í•˜ê¸°
+			//BGRA Ã³¸®ÇÏ±â
 			int idx = (y * width + x) * channels;
 			pixels[idx + 0] = gray;
-			pixels[idx + 1] = gray; 
+			pixels[idx + 1] = gray;
 			pixels[idx + 2] = gray;
-			pixels[idx + 3] = 255;  
+			pixels[idx + 3] = 255;
 		}
 	}
 
-	//ì‚¬ìš© ëë‚œ í›„ ì´ˆê¸°í™”í•˜ê¸°
+	//»ç¿ë ³¡³­ ÈÄ ÃÊ±âÈ­ÇÏ±â
 	ClearFFTData();
 
 	return true;
