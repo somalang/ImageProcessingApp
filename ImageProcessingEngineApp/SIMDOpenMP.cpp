@@ -1,4 +1,6 @@
-#include <fstream>
+#include <omp.h>
+#include <windows.h>
+#include <string>
 #include "ImageProcessingEngineApp.h"
 
 using namespace std;
@@ -8,6 +10,7 @@ void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, 
 	// 모든 픽셀의 RGB 값을 구한다
 	unsigned int avg = 0;
 	unsigned int red, blue, green;
+
 #pragma omp parallel for private(red, green, blue, avg)
 	for (int i = 0; i < width * height; i++) {
 		red = pixels[i * 4 + 0];
@@ -17,35 +20,42 @@ void NativeEngine::ImageProcessingEngine::ApplyGrayscale(unsigned char* pixels, 
 		pixels[i * 4 + 0] = avg;
 		pixels[i * 4 + 1] = avg;
 		pixels[i * 4 + 2] = avg;
+
+		if (i < 20) {
+			std::string msg = "Pixel " + std::to_string(i) +
+				" processed by thread " + std::to_string(omp_get_thread_num()) + "\n";
+			OutputDebugStringA(msg.c_str());
+		}
 	}
 }
 
 //명도는 유지한다 (alpha)
-
-void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixels, int width, int height, float sigma) {
-	const int channels = 4; // BGRA 포맷이므로 4채널
+void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(
+	unsigned char* pixels, int width, int height, float sigma)
+{
+	const int channels = 4; // BGRA 포맷
 	const int stride = width * channels;
 	const int dataSize = stride * height;
+
+	// WPF 배열을 안전하게 임시 벡터로 복사
+	std::vector<unsigned char> inputBuffer(pixels, pixels + dataSize);
+	std::vector<unsigned char> tempBuffer(dataSize);
 
 	// 가우시안 커널 계산
 	int kernelRadius = static_cast<int>(ceil(sigma * 3));
 	int kernelSize = kernelRadius * 2 + 1;
 	std::vector<double> kernel(kernelSize);
 	double sum = 0.0;
-
 	for (int i = 0; i < kernelSize; i++) {
 		kernel[i] = exp(-0.5 * pow((i - kernelRadius) / sigma, 2.0));
 		sum += kernel[i];
 	}
-	// 정규화
-	for (int i = 0; i < kernelSize; i++) {
-		kernel[i] /= sum;
-	}
+	for (int i = 0; i < kernelSize; i++) kernel[i] /= sum;
 
-	std::vector<unsigned char> temp(dataSize);
-
-	//가로 블러 적용
-#pragma omp parallel for (static) private(b, g, r)
+	// ---------------------
+	// 가로 블러 적용 (병렬)
+	// ---------------------
+#pragma omp parallel for schedule(static)
 	for (int y = 0; y < height; ++y) {
 		for (int x = 0; x < width; ++x) {
 			double b = 0.0, g = 0.0, r = 0.0;
@@ -53,20 +63,22 @@ void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixel
 				int nx = std::clamp(x + k, 0, width - 1);
 				int idx = y * stride + nx * channels;
 				double weight = kernel[k + kernelRadius];
-				b += pixels[idx + 0] * weight;
-				g += pixels[idx + 1] * weight;
-				r += pixels[idx + 2] * weight;
+				b += inputBuffer[idx + 0] * weight;
+				g += inputBuffer[idx + 1] * weight;
+				r += inputBuffer[idx + 2] * weight;
 			}
 			int out_idx = y * stride + x * channels;
-			temp[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
-			temp[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
-			temp[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
-			temp[out_idx + 3] = pixels[out_idx + 3]; // 알파 채널은 그대로 유지
+			tempBuffer[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
+			tempBuffer[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
+			tempBuffer[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
+			tempBuffer[out_idx + 3] = inputBuffer[out_idx + 3]; // 알파 유지
 		}
 	}
 
-	// 세로 블러 적용
-#pragma omp parallel for (static) private(b, g, r)
+	// ---------------------
+	// 세로 블러 적용 (병렬)
+	// ---------------------
+#pragma omp parallel for schedule(static)
 	for (int y = 0; y < height; ++y) {
 		for (int x = 0; x < width; ++x) {
 			double b = 0.0, g = 0.0, r = 0.0;
@@ -74,71 +86,89 @@ void NativeEngine::ImageProcessingEngine::ApplyGaussianBlur(unsigned char* pixel
 				int ny = std::clamp(y + k, 0, height - 1);
 				int idx = ny * stride + x * channels;
 				double weight = kernel[k + kernelRadius];
-				b += temp[idx + 0] * weight;
-				g += temp[idx + 1] * weight;
-				r += temp[idx + 2] * weight;
+				b += tempBuffer[idx + 0] * weight;
+				g += tempBuffer[idx + 1] * weight;
+				r += tempBuffer[idx + 2] * weight;
 			}
 			int out_idx = y * stride + x * channels;
 			pixels[out_idx + 0] = static_cast<unsigned char>(std::clamp(b, 0.0, 255.0));
 			pixels[out_idx + 1] = static_cast<unsigned char>(std::clamp(g, 0.0, 255.0));
 			pixels[out_idx + 2] = static_cast<unsigned char>(std::clamp(r, 0.0, 255.0));
-			// 알파 채널 처리 필요 없음 (명도라서)
+			// 알파 채널 그대로
 		}
 	}
 }
 
+
 void NativeEngine::ImageProcessingEngine::ApplyMedian(unsigned char* pixels, int width, int height, int kernelSize) {
-	const int channels = 4; // BGRA 포맷
+	const int channels = 4;
 	const int stride = width * channels;
 	const int dataSize = stride * height;
 
-	// 최종 결과 저장 버퍼 - 4채널
 	std::vector<unsigned char> result(dataSize);
-
 	int kernelHalf = kernelSize / 2;
+	int kernelArea = kernelSize * kernelSize;
 
-	// 순회
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			// 이웃값 저장
-			std::vector<unsigned char> neighborhood_b;
-			std::vector<unsigned char> neighborhood_g;
-			std::vector<unsigned char> neighborhood_r;
+	// median_index를 미리 계산 (한 번만)
+	const size_t medianIndex = static_cast<size_t>(kernelArea / 2);
 
-			// 커널
-			for (int ky = -kernelHalf; ky <= kernelHalf; ky++) {
-				for (int kx = -kernelHalf; kx <= kernelHalf; kx++) {
-					// 경계 처리
-					int nx = std::clamp(x + kx, 0, width - 1);
-					int ny = std::clamp(y + ky, 0, height - 1);
+	// OpenMP 병렬 처리 영역을 루프 바깥으로 확장
+#pragma omp parallel
+	{
+		// 각 스레드가 사용할 벡터를 한 번만 선언 (메모리 재사용)
+		std::vector<unsigned char> blue;
+		std::vector<unsigned char> green;
+		std::vector<unsigned char> red;
 
-					// 4채널을 고려한 인덱스 계산
-					int neighbor_idx = ny * stride + nx * channels;
+		// 미리 공간을 할당하여 루프 내에서의 재할당 방지
+		blue.reserve(kernelArea);
+		green.reserve(kernelArea);
+		red.reserve(kernelArea);
 
-					// 각 채널의 값을 해당 벡터에 추가
-					neighborhood_b.push_back(pixels[neighbor_idx + 0]);
-					neighborhood_g.push_back(pixels[neighbor_idx + 1]);
-					neighborhood_r.push_back(pixels[neighbor_idx + 2]);
+		// 스레드들이 y 루프를 나누어 처리
+#pragma omp for schedule(dynamic,4)
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				// 벡터를 재사용하기 전에 이전 데이터를 지움
+				blue.clear();
+				green.clear();
+				red.clear();
+
+				// 커널 순회
+				for (int ky = -kernelHalf; ky <= kernelHalf; ky++) {
+					for (int kx = -kernelHalf; kx <= kernelHalf; kx++) {
+						int nx = std::clamp(x + kx, 0, width - 1);
+						int ny = std::clamp(y + ky, 0, height - 1);
+						int neighbor_idx = ny * stride + nx * channels;
+
+						blue.push_back(pixels[neighbor_idx + 0]);
+						green.push_back(pixels[neighbor_idx + 1]);
+						red.push_back(pixels[neighbor_idx + 2]);
+					}
 				}
+
+				// 중앙값 찾기: 전체 정렬 대신 nth_element 사용
+				std::nth_element(blue.begin(),
+					blue.begin() + medianIndex,
+					blue.end());
+				std::nth_element(green.begin(),
+					green.begin() + medianIndex,
+					green.end());
+				std::nth_element(red.begin(),
+					red.begin() + medianIndex,
+					red.end());
+
+				int current_idx = y * stride + x * channels;
+
+				result[current_idx + 0] = blue[medianIndex];
+				result[current_idx + 1] = green[medianIndex];
+				result[current_idx + 2] = red[medianIndex];
+				result[current_idx + 3] = pixels[current_idx + 3];
 			}
-
-			// 채널 정렬 - 중앙값 찾기
-			std::sort(neighborhood_b.begin(), neighborhood_b.end());
-			std::sort(neighborhood_g.begin(), neighborhood_g.end());
-			std::sort(neighborhood_r.begin(), neighborhood_r.end());
-
-			int current_idx = y * stride + x * channels;
-
-			// 중앙값으로 버퍼 채우기
-			size_t median_index = neighborhood_b.size() / 2;
-			result[current_idx + 0] = neighborhood_b[median_index]; // B
-			result[current_idx + 1] = neighborhood_g[median_index]; // G
-			result[current_idx + 2] = neighborhood_r[median_index]; // R
-			result[current_idx + 3] = pixels[current_idx + 3]; // Alpha는 원본 그대로
 		}
-	}
+	} // 병렬 처리 영역 종료
 
-	// 결과 복사
+	// 최종 결과를 원본 픽셀 버퍼로 복사
 	memcpy(pixels, result.data(), dataSize);
 }
 
@@ -150,7 +180,7 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 	std::vector<unsigned char> gray(pixelCount);
 	std::vector<int> histogram(256, 0);
 
-	// RGB → Grayscale 변환
+	// 1. RGB → Grayscale 변환 (병렬 처리)
 #pragma omp parallel for
 	for (int i = 0; i < pixelCount; ++i) {
 		gray[i] = static_cast<unsigned char>(
@@ -160,19 +190,31 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 			);
 	}
 
-	// 히스토그램
-#pragma omp parallel for reduction(+:histogram[:256])
-	for (int i = 0; i < pixelCount; i++) {
-		histogram[gray[i]]++;
+	// 히스토그램 계산
+#pragma omp parallel
+	{
+		// 스레드별 로컬 히스토그램을 생성
+		std::vector<int> local_histogram(256, 0);
+
+		// 스레드 -> 로컬 히스토그램에 저장
+#pragma omp for nowait
+		for (int i = 0; i < pixelCount; i++) {
+			local_histogram[gray[i]]++;
+		}
+
+		// 로컬 -> 전체 히스토그램
+#pragma omp critical
+		for (int i = 0; i < 256; i++) {
+			histogram[i] += local_histogram[i];
+		}
 	}
 
-	// 전체 픽셀 밝기 합
+	// 최적 임계값 계산
 	float totalSum = 0.0f;
 	for (int i = 0; i < 256; i++) {
 		totalSum += i * histogram[i];
 	}
 
-	// 오츠알고리즘 계산
 	float sumForeground = 0.0f;
 	int weightForeground = 0;
 	int weightBackground = 0;
@@ -192,7 +234,6 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 		float meanForeground = sumForeground / weightForeground;
 		float meanBackground = (totalSum - sumForeground) / weightBackground;
 
-		// 클래스 간 분산
 		float varianceBetween = static_cast<float>(weightForeground) *
 			static_cast<float>(weightBackground) *
 			(meanForeground - meanBackground) *
@@ -204,7 +245,7 @@ void NativeEngine::ImageProcessingEngine::ApplyBinarization(unsigned char* pixel
 		}
 	}
 
-	//최적 임계값으로 이진화 처리
+	// 최적 임계값
 #pragma omp parallel for
 	for (int i = 0; i < pixelCount; ++i) {
 		unsigned char value = (gray[i] > optimalThreshold) ? 255 : 0;
@@ -426,6 +467,7 @@ void NativeEngine::ImageProcessingEngine::ApplyTemplateMatch(
 	// 템플릿도 변환
 	int templatePixelNum = templateWidth * templateHeight;
 	std::vector<unsigned char> templateGrayScaled(templatePixelNum);
+
 #pragma omp parallel for
 	for (int i = 0; i < templatePixelNum; ++i) {
 		templateGrayScaled[i] = static_cast<unsigned char>(
@@ -433,34 +475,56 @@ void NativeEngine::ImageProcessingEngine::ApplyTemplateMatch(
 			);
 	}
 
-	long long min = -1; // 절대차 합의 최솟값 저장
-	*matchX = -1;
-	*matchY = -1;
+	long long min = -1; // 최종 최솟값을 저장할 변수
+	int finalMatchX = -1;
+	int finalMatchY = -1;
 
-	// 템플릿 매칭 수행
-#pragma omp parallel for
-	for (int y = 0; y <= originalHeight - templateHeight; y++) {
-		for (int x = 0; x <= originalWidth - templateWidth; x++) {
-			long long currentSAD = 0;
+	// 템플릿 매칭 수행 (병렬 처리)
+#pragma omp parallel
+	{
+		long long localMin = -1; // 각 스레드가 독립적으로 사용할 지역 변수
+		int localMatchX = -1;
+		int localMatchY = -1;
 
-			// 템플릿 영역 순회 -> 절대차 합계 계산
-			for (int ty = 0; ty < templateHeight; ty++) {
-				for (int tx = 0; tx < templateWidth; tx++) {
-					int originalIdx = (y + ty) * originalWidth + (x + tx);
-					int templateIdx = ty * templateWidth + tx;
+		// y 루프를 스레드들이 나누어 처리하도록 설정
+#pragma omp for
+		for (int y = 0; y <= originalHeight - templateHeight; y++) {
+			for (int x = 0; x <= originalWidth - templateWidth; x++) {
+				long long currentSAD = 0;
 
-					currentSAD += abs(originalGrayScaled[originalIdx] - templateGrayScaled[templateIdx]);
+				// 템플릿 영역 순회 -> 절대차 합계(SAD) 계산
+				for (int ty = 0; ty < templateHeight; ty++) {
+					for (int tx = 0; tx < templateWidth; tx++) {
+						int originalIdx = (y + ty) * originalWidth + (x + tx);
+						int templateIdx = ty * templateWidth + tx;
+
+						currentSAD += abs(originalGrayScaled[originalIdx] - templateGrayScaled[templateIdx]);
+					}
+				}
+
+				// 각 스레드는 자신의 담당 구역에서만 최소값을 찾음
+				if (localMin == -1 || currentSAD < localMin) {
+					localMin = currentSAD;
+					localMatchX = x;
+					localMatchY = y;
 				}
 			}
+		}
 
-			// 절대차 합이 가장 작은 위치 계산
-			if (min == -1 || currentSAD < min) {
-				min = currentSAD;
-				*matchX = x;
-				*matchY = y;
+		// 모든 스레드가 각자의 계산을 마친 후, 결과를 취합
+#pragma omp critical
+		{
+			if (min == -1 || localMin < min) {
+				min = localMin;
+				finalMatchX = localMatchX;
+				finalMatchY = localMatchY;
 			}
 		}
-	}
+	} // 병렬 처리 영역 종료
+
+	// 최종 결과를 포인터를 통해 반환
+	*matchX = finalMatchX;
+	*matchY = finalMatchY;
 }
 
 void fft1d(vector<complex<double>>& data, bool inverse = false) {
@@ -468,7 +532,6 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 	if (num <= 1) return;
 
 	// 비트 반전 순서로 데이터 재정렬
-#pragma omp parallel for
 	for (int i = 1, j = 0; i < num; i++) {
 		int bit = num >> 1;
 		for (; j & bit; bit >>= 1)
@@ -479,10 +542,10 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 	}
 
 	// 버터플라이 연산
-#pragma omp parallel for
 	for (int len = 2; len <= num; len <<= 1) {
 		double ang = 2 * std::numbers::pi / len * (inverse ? -1 : 1);
 		complex<double> wlen(cos(ang), sin(ang));
+#pragma omp parallel for
 		for (int i = 0; i < num; i += len) {
 			complex<double> w(1);
 			for (int j = 0; j < len / 2; j++) {
@@ -497,8 +560,9 @@ void fft1d(vector<complex<double>>& data, bool inverse = false) {
 
 	// IFFT일 경우 크기 보정
 	if (inverse) {
-		for (auto& val : data) {
-			val /= num;
+#pragma omp parallel for
+		for (int i = 0; i < num; i++) {
+			data[i] /= num;
 		}
 	}
 }
@@ -646,3 +710,4 @@ void NativeEngine::ImageProcessingEngine::ClearFFTData() {
 bool NativeEngine::ImageProcessingEngine::HasFFTData() {
 	return !_fftDataBackup.empty() && !_fftDataBackup[0].empty();
 }
+

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ImageProcessingApp": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

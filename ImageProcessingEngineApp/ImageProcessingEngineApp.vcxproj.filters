@@ -18,6 +18,9 @@
     <ClCompile Include="ImageProcessingEngineApp.cpp">
       <Filter>리소스 파일\소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="SIMDOpenMP.cpp">
+      <Filter>리소스 파일\소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImageProcessingEngineApp.h">

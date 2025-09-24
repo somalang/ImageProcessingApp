@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cstring>
 #include <omp.h>
+#include <fstream>
+#include <cstdio>
 
 #ifdef IMAGEPROCESSINGENGINEAPP_EXPORTS
 #define ENGINE_API __declspec(dllexport)

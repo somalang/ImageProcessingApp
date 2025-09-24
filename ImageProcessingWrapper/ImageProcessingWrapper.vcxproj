@@ -84,6 +84,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>C:\Users\sohyun\source\repos\ImageProcessingApp\ImageProcessingEngineApp</AdditionalIncludeDirectories>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ImageProcessingEngineApp.lib;%(AdditionalDependencies)</AdditionalDependencies>
