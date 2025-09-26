@@ -126,23 +126,28 @@ namespace ImageProcessing.Services
                 return Rect.Empty;
             }
         }
+        private BitmapImage ProcessImageInternal(BitmapImage img, Action<byte[], int, int> processAction)
+        {
+            var bitmap = new FormatConvertedBitmap(img, PixelFormats.Bgra32, null, 0);
+            int width = bitmap.PixelWidth;
+            int height = bitmap.PixelHeight;
+            int stride = width * 4;
+            byte[] pixels = new byte[height * stride];
+            bitmap.CopyPixels(pixels, stride, 0);
+
+            processAction(pixels, width, height);
+
+            var processedBitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+            return ConvertBitmapSourceToBitmapImage(processedBitmap);
+        }
+
         private BitmapImage ApplyFilter(BitmapImage source, Action<byte[], int, int> processAction)
         {
-            return ProcessImage(source, (img) => {
-                //이미지를 rgb - bgra 중에 그냥 bgra로 정하기
-                var bitmap = new FormatConvertedBitmap(img, PixelFormats.Bgra32, null, 0);
-                int width = bitmap.PixelWidth;
-                int height = bitmap.PixelHeight;
-                int stride = width * 4;
-                byte[] pixels = new byte[height * stride];
-                bitmap.CopyPixels(pixels, stride, 0);
-
-                processAction(pixels, width, height);
-
-                var processedBitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
-                return ConvertBitmapSourceToBitmapImage(processedBitmap);
+            return ProcessImage(source, delegate (BitmapImage img) {
+                return ProcessImageInternal(img, processAction);
             });
         }
+
 
         public BitmapImage ApplyGrayscale(BitmapImage source) {
            return ApplyFilter(source, (p, w, h) => _engine.ApplyGrayscale(p, w, h));
@@ -240,21 +245,27 @@ namespace ImageProcessing.Services
         private BitmapImage ConvertBitmapSourceToBitmapImage(BitmapSource source)
         {
             if (source == null) return null;
-            if (source is BitmapImage bitmapImage && bitmapImage.StreamSource == null) return bitmapImage;
 
-            var encoder = new PngBitmapEncoder();
+            // 소스가 이미 BitmapImage이고 스트림 소스가 없는 경우 (메모리에 이미 있는 경우) 바로 반환
+            if (source is BitmapImage bitmapImage && bitmapImage.StreamSource == null)
+            {
+                return bitmapImage;
+            }
+
+            // PNG 인코더 대신 훨씬 빠른 BmpBitmapEncoder를 사용합니다.
+            var encoder = new BmpBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(source));
             using (var stream = new MemoryStream())
             {
                 encoder.Save(stream);
-                stream.Seek(0, SeekOrigin.Begin);
+                stream.Position = 0; // 스트림 위치를 처음으로 리셋
 
                 var result = new BitmapImage();
                 result.BeginInit();
                 result.CacheOption = BitmapCacheOption.OnLoad;
                 result.StreamSource = stream;
                 result.EndInit();
-                result.Freeze();
+                result.Freeze(); // UI 스레드 외에서도 접근 가능하도록 고정
                 return result;
             }
         }

@@ -434,10 +434,16 @@ namespace ImageProcessing.ViewModel
             await SaveImageAsync();
         }
 
+        private BitmapImage ApplyGrayscaleWrapper()
+        {
+            return _imageProcessor.ApplyGrayscale(CurrentBitmapImage);
+        }
+
         private void OnApplyGrayscale(object parameter)
         {
-            ApplyFilter(() => _imageProcessor.ApplyGrayscale(CurrentBitmapImage), "GrayScale");
+            ApplyFilter(ApplyGrayscaleWrapper, "GrayScale");
         }
+
 
         private void OnApplySobel(object parameter)
         {
