@@ -20,7 +20,9 @@ namespace ImageProcessingWrapper {
         !ImageEngine() { delete _nativeEngine; }
 
         void ApplyGrayscale(array<System::Byte>^ pixels, int width, int height);
-        void ApplyGaussianBlur(array<Byte>^ data, int width, int height, float sigma);
+        //void ApplyGaussianBlur(array<Byte>^ data, int width, int height, float sigma);
+        void ApplyGaussianBlur(array<Byte>^ data, int width, int height, int radius);
+
         void ApplyMedian(array<System::Byte>^ pixels, int width, int height, int kernelSize);
         void ApplyBinarization(array<System::Byte>^ pixels, int width, int height);
         void ApplyDilation(array<System::Byte>^ pixels, int width, int height);

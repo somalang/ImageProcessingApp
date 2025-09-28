@@ -457,7 +457,7 @@ namespace ImageProcessing.ViewModel
 
         private void OnApplyGaussianBlur(object parameter)
         {
-            ApplyFilter(() => _imageProcessor.ApplyGaussianBlur(CurrentBitmapImage, (float)FilterParameters.GaussianSigma), "Gaussian Blur");
+            ApplyFilter(() => _imageProcessor.ApplyGaussianBlur(CurrentBitmapImage, (int)FilterParameters.GaussianSigma), "Gaussian Blur");
         }
 
         private void OnApplyBinarization(object parameter)

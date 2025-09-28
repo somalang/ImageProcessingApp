@@ -7,11 +7,14 @@ void ImageEngine::ApplyGrayscale(array<System::Byte>^ pixels, int width, int hei
     pin_ptr<unsigned char> p = &pixels[0];
     _nativeEngine->ApplyGrayscale(p, width, height);
 }
-void ImageEngine::ApplyGaussianBlur(array<System::Byte>^ pixels, int width, int height, float sigma) {
+//void ImageEngine::ApplyGaussianBlur(array<System::Byte>^ pixels, int width, int height, float sigma) {
+//    pin_ptr<unsigned char> p = &pixels[0];
+//    _nativeEngine->ApplyGaussianBlur(p, width, height, sigma);
+//}
+void ImageEngine::ApplyGaussianBlur(array<System::Byte>^ pixels, int width, int height, int radius) {
     pin_ptr<unsigned char> p = &pixels[0];
-    _nativeEngine->ApplyGaussianBlur(p, width, height, sigma);
+    _nativeEngine->ApplyGaussianBlur(p, width, height, radius);
 }
-
 void ImageEngine::ApplyMedian(array<System::Byte>^ pixels, int width, int height, int kernelSize) {
     pin_ptr<unsigned char> p = &pixels[0];
     _nativeEngine->ApplyMedian(p, width, height, kernelSize);

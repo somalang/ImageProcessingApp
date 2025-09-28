@@ -152,8 +152,12 @@ namespace ImageProcessing.Services
         public BitmapImage ApplyGrayscale(BitmapImage source) {
            return ApplyFilter(source, (p, w, h) => _engine.ApplyGrayscale(p, w, h));
         }
-        public BitmapImage ApplyGaussianBlur(BitmapImage source, float sigma) { 
-            return ApplyFilter(source, (p, w, h) => _engine.ApplyGaussianBlur(p, w, h, sigma));
+        //public BitmapImage ApplyGaussianBlur(BitmapImage source, float sigma) { 
+        //    return ApplyFilter(source, (p, w, h) => _engine.ApplyGaussianBlur(p, w, h, sigma));
+        //}
+        public BitmapImage ApplyGaussianBlur(BitmapImage source, int radius)
+        {
+            return ApplyFilter(source, (p, w, h) => _engine.ApplyGaussianBlur(p, w, h, radius));
         }
         public BitmapImage ApplySobel(BitmapImage source) { 
             return ApplyFilter(source, (p, w, h) => _engine.ApplySobel(p, w, h));
@@ -252,7 +256,6 @@ namespace ImageProcessing.Services
                 return bitmapImage;
             }
 
-            // PNG 인코더 대신 훨씬 빠른 BmpBitmapEncoder를 사용합니다.
             var encoder = new BmpBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(source));
             using (var stream = new MemoryStream())

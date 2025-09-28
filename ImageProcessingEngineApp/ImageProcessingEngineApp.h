@@ -31,7 +31,9 @@ namespace NativeEngine {
 		//퍼블릭 메서드
 	public:
 		void ApplyGrayscale(unsigned char* data, int width, int height);
-		void ApplyGaussianBlur(unsigned char* data, int width, int height, float sigma);
+		//void ApplyGaussianBlur(unsigned char* data, int width, int height, float sigma);
+		void ApplyGaussianBlur(unsigned char* data, int width, int height, int radius);
+
 		void ApplyMedian(unsigned char* data, int width, int height, int kernelSize);
 		void ApplyBinarization(unsigned char* data, int width, int height);
 		void ApplyDilation(unsigned char* data, int width, int height);
